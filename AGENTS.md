@@ -29,7 +29,8 @@ Skipping this protocol produces inconsistent code and failed reviews.
 | Purpose | Consolidate ~50 CV/cover-letter documents into a single knowledge base spreadsheet, then use Claude to generate tailored CVs, cover letters, and freelance-platform profiles |
 | Architecture | Pipeline (ingest → analytics → knowledge base) + agent layer (tailoring, voice, profiles) |
 | Knowledge base | `.xlsx` (source of truth, versioned in git) + Google Sheets sync |
-| AI engine | Anthropic Python SDK, `claude-opus-4-8`, adaptive thinking |
+| AI engine (text tasks) | `opencode` CLI subprocess, model `opencode-go/deepseek-v4-pro` — see Decision Log |
+| AI engine (document generation, Fase 4) | Anthropic Python SDK, `claude-opus-4-8` — Agent Skills/`web_fetch` have no opencode equivalent |
 | API + CLI | FastAPI + Typer CLI |
 
 ### Component Layout
@@ -41,7 +42,7 @@ Skipping this protocol produces inconsistent code and failed reviews.
 | Knowledge | `src/cvpal/knowledge/` | Build the `.xlsx` workbook; sync to Google Sheets |
 | Voice | `src/cvpal/voice/` | Extract a style guide from existing cover letters |
 | Agents | `src/cvpal/agents/` | CV tailoring, cover letters, freelance profiles, job search |
-| LLM | `src/cvpal/llm/` | Anthropic client, system prompts, Agent Skills wiring |
+| LLM | `src/cvpal/llm/` | `opencode` CLI subprocess wrapper (text tasks); Anthropic client for Fase 4 doc generation |
 | API | `src/cvpal/api/` | FastAPI endpoints |
 | CLI | `src/cvpal/cli.py` | Typer entry point |
 | Skills | `skills/` | Agent behavior, coding patterns, quality gates |
@@ -152,7 +153,10 @@ Architectural decisions made — do not relitigate without strong evidence:
 | Knowledge base content in English by default | Avoids maintaining ES/EN duplicates; translation happens on-the-fly per job application in Fase 4 |
 | Voice/tone extracted from existing cover letters | Bruno's existing letters are the ground truth for "sounding like him" — no separate interview needed for MVP |
 | Freelance profiles = human-in-the-loop | Upwork/Fiverr ToS prohibit account automation; agent generates content, Bruno pastes/reviews. API automation only where a real API exists (e.g. Himalayas/boards) |
-| `claude-opus-4-8` as the default model | Most capable model at the time of writing; used for translation, tailoring, and voice extraction |
+| Text-generation tasks (translation, dedupe/structuring, voice extraction) go through the `opencode` CLI with `opencode-go/deepseek-v4-pro`, not the Anthropic SDK | Explicit user decision, confirmed twice after initial clarification. cv-pal shells out to the already-authenticated `opencode` CLI (`src/cvpal/llm/opencode_client.py`) instead of reading its credential store directly. **Anthropic's `claude-opus-4-8` remains the engine for Fase 4** (document generation via Agent Skills, `web_fetch` for job postings) — DeepSeek/opencode has no equivalent for those Anthropic-specific server tools |
+| Per-section LLM calls, not one giant call | A single call covering all CV sections at once triggered unreliable behavior in the opencode harness: tool-call permissions are auto-denied in non-interactive `run` mode, so a large JSON response the model tried to write to a scratch file silently produced empty output. Splitting into one small call per canonical section (personal_data, summary, experience, education+certifications, skills, projects, languages) keeps outputs small enough to return as plain chat text reliably |
+| `source_files` capped at 3 representative files per record | Uncapped lists blew up JSON output size for near-universal facts (e.g. a skill appearing in 30+ of 38 CVs), truncating the response mid-string. Traceability doesn't need every duplicate, just a representative sample |
+| Checkpoint every LLM structuring step to disk | Individual pipeline runs can exceed the harness's background-execution time limit; checkpointing each step's result (`data/.checkpoints/`, gitignored) lets `cvpal build-sheet` be re-run in short bursts, resuming instead of re-paying completed LLM calls |
 | Engram consulted every session | Persistent memory protocol is globally active; always `mem_search`/`mem_context` at start, `mem_save` after decisions |
 
 ---

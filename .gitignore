@@ -21,6 +21,7 @@ data/outputs/*
 # NOTE: data/cv-knowledge-base.xlsx is intentionally NOT ignored - per the
 # Decision Log in AGENTS.md it is the git-versioned source of truth.
 data/ingested.json
+data/.checkpoints/
 
 .idea/
 .vscode/

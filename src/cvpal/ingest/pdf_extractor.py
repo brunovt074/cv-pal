@@ -24,6 +24,21 @@ def _alpha_ratio(text: str) -> float:
     return alpha / len(non_whitespace)
 
 
+def _extract_hyperlinks(path: Path) -> list[str]:
+    """Plain-text extraction loses hyperlink targets (e.g. a "LinkedIn" link
+    renders as the word "LinkedIn", not its URL) - PDF hyperlinks are page
+    annotations, separate from the text layer, so we pull them separately.
+    """
+    urls: list[str] = []
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages:
+            for link in page.hyperlinks:
+                uri = link.get("uri")
+                if uri and uri not in urls:
+                    urls.append(uri)
+    return urls
+
+
 def _extract_with_pdfplumber(path: Path) -> str:
     parts: list[str] = []
     with pdfplumber.open(path) as pdf:
@@ -46,23 +61,32 @@ def _extract_with_pdftotext(path: Path) -> str | None:
     return result.stdout.decode(errors="replace")
 
 
+def _append_links(text: str, urls: list[str]) -> str:
+    if not urls:
+        return text
+    return text + "\n\nLinks:\n" + "\n".join(urls)
+
+
 def extract_pdf_text(path: Path) -> tuple[str, list[str]]:
     """Extract text from a PDF, falling back to `pdftotext -layout` if the
     pdfplumber output looks garbled (low alpha ratio among non-whitespace
-    characters, e.g. scanned/corrupted PDFs).
+    characters, e.g. scanned/corrupted PDFs). Hyperlink targets (LinkedIn,
+    GitHub, project URLs) are appended as a "Links:" block since they live
+    in page annotations, not the text layer either extractor reads.
 
     Returns (text, warnings).
     """
     warnings: list[str] = []
+    urls = _extract_hyperlinks(path)
     text = _extract_with_pdfplumber(path)
 
     if _alpha_ratio(text) >= _MIN_ALPHA_RATIO:
-        return text, warnings
+        return _append_links(text, urls), warnings
 
     warnings.append("pdfplumber output looked garbled, falling back to pdftotext -layout")
     fallback_text = _extract_with_pdftotext(path)
     if fallback_text is not None and _alpha_ratio(fallback_text) >= _MIN_ALPHA_RATIO:
-        return fallback_text, warnings
+        return _append_links(fallback_text, urls), warnings
 
     warnings.append("pdftotext fallback also failed or unavailable; using raw pdfplumber output")
-    return text, warnings
+    return _append_links(text, urls), warnings

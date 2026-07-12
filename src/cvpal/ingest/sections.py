@@ -58,6 +58,9 @@ SECTION_KEYWORDS: dict[str, list[str]] = {
         "contacto",
         "contact",
     ],
+    "links": [
+        "links",
+    ],
 }
 
 _HEADER_LINE_MAX_LEN = 60
