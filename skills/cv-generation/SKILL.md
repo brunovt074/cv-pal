@@ -2,55 +2,67 @@
 
 ## Scope
 
-`src/cvpal/agents/cv_tailor.py`, `src/cvpal/agents/cover_letter.py`, `src/cvpal/llm/` — the core
-of historia 2: given a job posting URL, produce a tailored CV and cover letter as real
-`.docx`/`.pdf` files, written in Bruno's voice, in the right language.
+`src/cvpal/application/use_cases/tailor_cv.py`, `application/prompts/tailoring.py`,
+`infrastructure/job_postings/`, `infrastructure/agents/` — given a job posting (text, file, or
+URL), produce a CV tailored to it from `data/knowledge-base.md`, written in the author's voice,
+in the right language. Currently markdown-out only; real `.docx`/`.pdf` output and a cover
+letter use case are the natural next steps (see Not Yet Wired below).
 
 ## When to read this skill
 
-Before writing or modifying any tailoring prompt, before wiring Agent Skills / server tools for
-document generation, before changing how the knowledge base or voice profile are loaded into
-context.
+Before writing or modifying the tailoring prompt, before wiring a `DocumentRenderPort` or
+`WebContentPort` adapter, before changing how the knowledge base is loaded into context.
 
 ## Principles
 
-- **Fetch the posting with `web_fetch_20260209`.** Declare it as a server tool on the request;
-  don't scrape client-side. The tool only fetches URLs already present in the conversation, so
-  the job URL must be in the user turn.
-- **Load the knowledge base as stable context, cache it.** The workbook content (or the relevant
-  slice: Experience, Skills, Education, Summary, VoiceProfile) is the same across every tailoring
-  request in a session — put it in `system` with `cache_control: {"type": "ephemeral"}` so
-  repeated runs in the same session are cheap. See `shared/prompt-caching.md` in the claude-api
-  skill for placement rules if this needs tuning later.
-- **Selection before writing.** The tailoring step is fundamentally: (1) read the job posting,
-  (2) select the subset of Experience bullets / Skills / Projects that are actually relevant —
-  do not dump the entire history into every CV, that's not "tailored" — (3) write the CV and
-  cover letter using only the selected material, in the extracted voice.
-- **Language detection and on-the-fly translation.** Default output language is inferred from the
-  job posting (if it's in Spanish, the CV/letter should be in Spanish; English posting → English
-  output) unless the user explicitly overrides it. This is where the "translate on the fly"
-  decision from the Decision Log gets executed — the knowledge base stays English, the
-  *generation* step is what translates, using the language-independent traits from the voice
-  profile (see `voice-style` skill) so tone survives translation.
-- **Real files, not just text.** Use Agent Skills (`docx`, `pdf`) via the `container` parameter +
-  `code_execution_20260521` tool, with both betas `code-execution-2025-08-25` and
-  `skills-2025-10-02` on `client.beta.messages.create`. Output lands as a file in the response;
-  download it via the Files API and save to `data/outputs/`. Do not settle for returning markdown
-  text as the "CV" — Bruno needs a document he can actually submit.
-- **Never fabricate experience.** The model must only use material present in the knowledge
-  base. If the job posting calls for something not in Bruno's background, the tailored CV should
-  honestly omit it or frame adjacent real experience — never invent a skill, certification, or
-  project. State this constraint explicitly and firmly in the system prompt.
+- **The knowledge base markdown IS the context — pass it whole, not a parsed slice.** Any agent
+  (opencode today, anything else tomorrow) reads `data/knowledge-base.md` as-is; there's no
+  provider-specific structured-context mechanism to keep portable across agents. If context size
+  becomes a problem, trim in `tailor_cv.py` before building the prompt, not by changing the file
+  format.
+- **Selection happens inside the prompt, not as a separate pre-filter.** The tailoring prompt
+  (`application/prompts/tailoring.py:tailor_cv_prompt`) explicitly instructs the agent to select
+  only the Experience bullets / Skills / Projects relevant to the posting — dumping the entire
+  history into every CV is not "tailored". If output quality suffers, the next step is a
+  deterministic pre-filter use case ahead of the prompt, not a bigger prompt.
+- **Language detection and on-the-fly translation.** Output language is inferred from the job
+  posting text (`infrastructure/parsers/sections.py:detect_language`, injected into `tailor_cv()`
+  as a callable — see the dependency-injection note in `container.py`) unless overridden via
+  `--language`. The knowledge base stays English; translation happens only at generation time,
+  guided by the language-independent voice traits (see `voice-style` skill) so tone survives
+  translation.
+- **Never fabricate experience.** The prompt states firmly: use ONLY material in the knowledge
+  base; if the posting calls for something absent, honestly omit it or frame the closest real,
+  adjacent experience — never invent a skill, certification, or project.
+
+## Not yet wired (by design, not oversight)
+
+- **Real `.docx`/`.pdf` output** needs a `DocumentRenderPort` adapter
+  (`domain/ports/document_render.py`) — no adapter implements it yet. `tailor_cv()` currently
+  returns markdown; `cvpal tailor` writes it straight to `data/outputs/*.md`.
+- **Fetching a job posting URL** needs a `WebContentPort` adapter
+  (`domain/ports/web_content.py`). `infrastructure/job_postings/url_source.py` raises
+  `CapabilityNotSupportedError` until one is registered. Note this is **not** a hard capability
+  gap in opencode itself — it has a native `webfetch` tool and MCP support — the actual blocker is
+  that its non-interactive `run` mode auto-denies tool permissions with no one to approve them
+  (`opencode run --auto` may lift this; not exercised yet). Don't assume opencode categorically
+  can't do this when deciding how to wire the adapter.
+- **A cover-letter use case**, mirroring `tailor_cv.py`, hasn't been built — only CV generation
+  has, matching what was actually asked for. Add `tailor_cover_letter.py` alongside it following
+  the same pattern (prompt in `application/prompts/`, use case in `application/use_cases/`) when
+  needed, rather than growing `tailor_cv.py` to do both.
 
 ## Output
 
-Two files per run in `data/outputs/`, named predictably (e.g.
-`{company}-{role}-{date}.{cv,cover-letter}.docx`), plus the `.pdf` if requested.
+`cvpal tailor --job-text "..."` / `--job-file posting.docx` writes `data/outputs/cv-tailored-{lang}.md`
+(or a path given via `--output`).
 
 ## Testing
 
-- Unit-test selection logic (given a mock job posting + mock knowledge base, does it pick
-  plausible bullets) separately from generation (which needs a live API call).
-- End-to-end verification is manual for the MVP: run against a real posting, open the resulting
-  document, check content accuracy and voice — see the `verify` skill's general guidance on
-  driving real behavior instead of only asserting on code structure.
+- Unit-test `tailor_cv()` with a `FakeTextAgent` and a fake `JobPostingSourcePort` (see
+  `tests/application/test_tailor_cv.py`) — asserts the prompt contains both the posting and the
+  knowledge base, and that language detection/override resolve correctly. No live agent call in
+  the automated suite.
+- End-to-end verification is manual: run `cvpal tailor` against a real posting, read the
+  resulting markdown, check content accuracy and voice — see the `verify` skill's general
+  guidance on driving real behavior instead of only asserting on code structure.

@@ -1,0 +1,182 @@
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+import typer
+from dotenv import load_dotenv
+
+from cvpal.application.use_cases.audit_knowledge_base import audit_personal_data
+from cvpal.application.use_cases.build_knowledge_base import build_knowledge_base
+from cvpal.application.use_cases.ingest_documents import ingest_documents
+from cvpal.application.use_cases.tailor_cv import tailor_cv
+from cvpal.config import get_settings
+from cvpal.container import Container
+from cvpal.domain.capabilities import Capability
+from cvpal.domain.ports.text_completion import CompletionRequest
+
+load_dotenv()
+
+app = typer.Typer(help="CV-Pal: knowledge base + tailored CV/cover-letter generation")
+agents_app = typer.Typer(help="Inspect/verify the configured text-completion agent")
+kb_app = typer.Typer(help="Build/inspect the knowledge base (data/knowledge-base.md)")
+app.add_typer(agents_app, name="agents")
+app.add_typer(kb_app, name="kb")
+
+
+@app.command()
+def ingest(
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Parse all source documents (CV_RAW_DIR) into normalized JSON."""
+    logging.basicConfig(level=logging.INFO if verbose else logging.WARNING)
+    settings = get_settings()
+    container = Container(settings)
+
+    documents = ingest_documents(settings.raw_dir, container.document_parser)
+    container.raw_document_repository.save(documents)
+
+    total = len(documents)
+    cvs = sum(1 for d in documents if d.doc_kind == "cv")
+    letters = sum(1 for d in documents if d.doc_kind == "cover_letter")
+    with_warnings = sum(1 for d in documents if d.extraction_warnings)
+    unknown_lang = sum(1 for d in documents if d.source_language == "unknown")
+
+    typer.echo(f"Ingested {total} documents ({cvs} CVs, {letters} cover letters) -> {settings.ingested_json}")
+    typer.echo(f"  {with_warnings} documents had extraction warnings")
+    typer.echo(f"  {unknown_lang} documents had undetected language")
+
+
+@kb_app.command("build")
+def kb_build(
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Bootstrap/refresh data/knowledge-base.md from data/ingested.json.
+
+    Runs one agent call per canonical section (JSON, validated against
+    domain models) and one for the voice profile; each step is
+    checkpointed under data/.checkpoints/ so a killed/interrupted run can
+    be re-run and resume instead of re-paying completed calls. Re-run this
+    only when adding new CVs to the source corpus - the markdown is
+    otherwise maintained by hand.
+    """
+    logging.basicConfig(level=logging.INFO if verbose else logging.WARNING)
+    settings = get_settings()
+    container = Container(settings)
+
+    if not container.raw_document_repository.exists():
+        typer.echo("No ingestion found. Run `cvpal ingest` first.", err=True)
+        raise typer.Exit(1)
+
+    agent = container.require(Capability.TEXT_COMPLETION, Capability.JSON_COMPLETION)
+    documents = container.raw_document_repository.load()
+
+    typer.echo(f"Building knowledge base with agent '{settings.agent_name}'...")
+    knowledge_base = build_knowledge_base(
+        documents, agent, settings.agent_name, container.checkpoint_store
+    )
+    container.knowledge_repository.save(knowledge_base)
+
+    typer.echo(f"Wrote knowledge base -> {settings.knowledge_base_md}")
+    typer.echo(f"  {len(knowledge_base.personal_data)} personal data fields")
+    typer.echo(f"  {len(knowledge_base.summaries)} summary variants")
+    typer.echo(f"  {len(knowledge_base.experience)} experience bullets")
+    typer.echo(f"  {len(knowledge_base.education)} education entries")
+    typer.echo(f"  {len(knowledge_base.certifications)} certifications")
+    typer.echo(f"  {len(knowledge_base.skills)} skills")
+    typer.echo(f"  {len(knowledge_base.projects)} projects")
+    typer.echo(f"  {len(knowledge_base.languages)} languages")
+    typer.echo(f"  voice profile: {'yes' if knowledge_base.voice_profile else 'no'}")
+
+
+@kb_app.command("audit")
+def kb_audit() -> None:
+    """Report personal-data fields with more than one distinct value
+    across the CV corpus (phone, linkedin, github, ...).
+    """
+    container = Container(get_settings())
+    if not container.knowledge_repository.exists():
+        typer.echo("No knowledge base found. Run `cvpal kb build` first.", err=True)
+        raise typer.Exit(1)
+
+    knowledge_base = container.knowledge_repository.load()
+    inconsistencies = audit_personal_data(knowledge_base)
+    if not inconsistencies:
+        typer.echo("No inconsistencies found.")
+        return
+    for item in inconsistencies:
+        typer.echo(f"{item.field}:")
+        for value in item.values:
+            typer.echo(f"  - {value}")
+
+
+@app.command()
+def tailor(
+    job_text: str = typer.Option(None, "--job-text", help="Job posting text, passed directly"),
+    job_file: Path = typer.Option(
+        None, "--job-file", help="Job posting file (.txt/.md/.docx)"
+    ),
+    job_url: str = typer.Option(
+        None, "--job-url", help="Job posting URL (not yet supported by any agent - see AGENTS.md)"
+    ),
+    language: str = typer.Option(
+        None, "--language", help="Force output language (e.g. 'en', 'es') instead of auto-detecting"
+    ),
+    output: Path = typer.Option(
+        None, "--output", "-o", help="Where to write the tailored CV (default: data/outputs/)"
+    ),
+) -> None:
+    """Generate a CV tailored to a job posting, using ONLY the knowledge base."""
+    settings = get_settings()
+    container = Container(settings)
+
+    if not container.knowledge_repository.exists():
+        typer.echo("No knowledge base found. Run `cvpal kb build` first.", err=True)
+        raise typer.Exit(1)
+
+    provided = [v for v in (job_text, job_file, job_url) if v is not None]
+    if len(provided) != 1:
+        typer.echo("Provide exactly one of: --job-text, --job-file, --job-url", err=True)
+        raise typer.Exit(1)
+
+    agent = container.require(Capability.TEXT_COMPLETION)
+    source = container.job_posting_source(text=job_text, file=job_file, url=job_url)
+    knowledge_base_markdown = settings.knowledge_base_md.read_text()
+
+    tailored = tailor_cv(
+        source, knowledge_base_markdown, agent, container.detect_language, language_override=language
+    )
+
+    output_path = output or (
+        settings.outputs_dir / f"cv-tailored-{tailored.language}.md"
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(tailored.content)
+
+    typer.echo(f"Wrote tailored CV ({tailored.language}) -> {output_path}")
+
+
+@agents_app.command("list")
+def agents_list() -> None:
+    """List registered agent providers."""
+    settings = get_settings()
+    for name in Container.available_agents():
+        marker = " (active)" if name == settings.agent_name else ""
+        typer.echo(f"{name}{marker}")
+
+
+@agents_app.command("check")
+def agents_check() -> None:
+    """Round-trip a trivial prompt against the configured agent."""
+    settings = get_settings()
+    container = Container(settings)
+    agent = container.agent
+
+    typer.echo(f"Agent: {settings.agent_name}")
+    typer.echo(f"Capabilities: {', '.join(c.value for c in agent.capabilities)}")
+    result = agent.complete(CompletionRequest(prompt="Reply with exactly the word: ok"))
+    typer.echo(f"Response: {result.text.strip()[:200]}")
+
+
+if __name__ == "__main__":
+    app()

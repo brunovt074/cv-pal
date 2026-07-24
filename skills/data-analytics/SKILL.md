@@ -2,59 +2,83 @@
 
 ## Scope
 
-`src/cvpal/analytics/` and `src/cvpal/knowledge/` — turning the raw `RawDocument` records from
-ingestion into the deduplicated, normalized, English-language knowledge base workbook
-(`data/cv-knowledge-base.xlsx`) and its Google Sheets mirror. This is the module that produces
-the MVP deliverable — treat schema changes here as high-stakes.
+`src/cvpal/application/use_cases/build_knowledge_base.py`, `application/prompts/extraction.py`,
+`application/prompts/voice.py`, `application/services/dedupe.py`,
+`application/services/personal_data_resolution.py`, and
+`infrastructure/persistence/markdown_knowledge_repository.py` — turning the raw `RawDocument`
+records from ingestion into `data/knowledge-base.md`, the single source of truth for all
+downstream agents. Treat schema changes to `domain/knowledge/models.py` as high-stakes: they
+change both the markdown table shape and any downstream reader (`cv-generation`).
+
+`infrastructure/persistence/xlsx_exporter.py` produces `data/cv-knowledge-base.xlsx` as an
+**optional** secondary export for manual review in a spreadsheet — it is not the source of truth.
 
 ## When to read this skill
 
-Before changing dedupe logic, the translation step, or any tab/column in the workbook schema.
+Before changing dedupe logic, an extraction prompt, the personal-data correction rules, or the
+markdown knowledge base's table shape.
 
 ## Principles
 
-- **English is the standard language of the knowledge base — always.** Every textual field
-  (summaries, experience bullets, project descriptions) is normalized to English before it is
-  written to any tab, regardless of the source document's language. This is a hard rule, not a
+- **The markdown file is the contract, not the agent's raw text.** Each extraction prompt
+  (`application/prompts/extraction.py`) asks the configured agent for JSON matching a
+  `domain/knowledge/models.py` pydantic model, validated via
+  `application/services/response_parsing.complete_as` — never for markdown prose directly. A
+  deterministic renderer (`markdown_knowledge_repository.save()`) turns the validated
+  `KnowledgeBase` into `data/knowledge-base.md` afterward. This keeps `build_knowledge_base()`
+  testable with a scripted `FakeTextAgent` (see `tests/fakes/fake_text_agent.py`) instead of
+  needing a live LLM call in the test suite.
+- **English is the standard language of the knowledge base — always.** Every textual field is
+  normalized to English before it's written to any section, regardless of source document
+  language — this is a hard rule stated in every extraction prompt's `_COMMON_RULES`, not a
   default that varies by row. Translation to Spanish (or any other language) happens only later,
-  at CV-generation time (`cv-generation` skill), never stored as a second copy in the base.
-  - Use `claude-opus-4-8` for translation of any block longer than a few words; don't
-    hand-roll translation heuristics.
-  - Every row keeps `source_language` in its trace metadata so a human can audit the translation
-    against the original if something reads oddly.
-- **Deduplication across CV versions is the core analytics problem.** The same role
-  ("Desarrollador de Software Java – Reyesoft") appears, worded slightly differently, across
-  multiple files in `Java/`, `cv-latests/`, `generic/`. Treat records as duplicates when
-  `(company, role, start_date)` match closely (fuzzy match on company/role strings — Levenshtein
-  or similar, not exact match) — then merge by keeping the **union of distinct bullets** across
-  versions (bullets that say the same thing in different words are still duplicates — dedupe
-  those too) and preferring the **most recent file's phrasing** when bullets conflict.
-- **Traceability metadata on every row:** `source_file`, `source_language`, `confidence`
-  (how sure the merge/translation logic is), `last_seen` (most recent source file's mtime).
-- **The workbook schema is the contract other modules build on** (`cv-generation` reads it,
-  `voice-style` reads the CoverLetters tab). Any schema change is a breaking change — update
-  `AGENTS.md`'s Decision Log and any downstream reader in the same change.
+  at CV-tailoring time (`cv-generation` skill), never stored as a second copy.
+- **Mechanical dedup before any agent call.** `application/services/dedupe.py` collapses
+  near-identical lines across all ~38 CV versions before the extraction prompt ever sees them —
+  this is what keeps each per-section call small, fast, and reliable. It is pure/deterministic
+  (no I/O, no agent) and lives in `application/`, not `infrastructure/`, for exactly that reason.
+- **One agent call per canonical section**, checkpointed independently
+  (`application/services/checkpointing.py` + `infrastructure/persistence/file_checkpoint_store.py`).
+  A single call covering everything triggers unreliable behavior (see `infrastructure/agents/`
+  docstrings on tool-permission denial for large outputs in non-interactive CLI agents) — keep
+  each call's *output* small.
+- **Which value is "current" is a fact, never an agent guess.** When the same personal-data field
+  (phone, LinkedIn, GitHub) has multiple distinct values across ~50 CV variants spanning years,
+  the extraction prompt returns ALL distinct values — `application/services/personal_data_resolution.py`
+  then deterministically tags exactly one as `(current)` against a hardcoded authoritative value,
+  and the rest `(previous)`. Never ask an agent to pick; it has no way to know which is right.
+- **Traceability, not a full audit trail.** Every record's `source_files` is capped at 3
+  representative files even if a fact appears in 30+ — enough to spot-check, not to enumerate
+  every duplicate (uncapped lists blow up JSON output size for near-universal facts and truncate
+  the response mid-string).
 
-## Workbook schema (tabs)
+## Knowledge base sections
 
-`PersonalData`, `Summary`, `Experience` (one row per bullet, not per role — so tailoring can
-pick individual bullets), `Education`, `Certifications`, `Skills`, `Projects`, `Languages`,
-`CVVersions` (inventory of all source docs), `CoverLetters` (inventory + normalized text),
-`VoiceProfile` (populated by the `voice-style` skill, not this one).
+`Personal Data`, `Summary` (2-3 variants by focus area), `Experience` (one row per bullet, not
+per role — so tailoring can pick individual bullets), `Education`, `Certifications`, `Skills`,
+`Projects`, `Languages`, `Voice Profile` (see `voice-style` skill — extracted in the same
+`build_knowledge_base()` pass from cover letters, not a separate step), and a free-form `Notes`
+section a human can add to by hand — preserved verbatim across `cvpal kb build` reruns (unlike
+the structured sections, which regenerate from scratch).
 
-## Google Sheets sync
+## Rebuilding vs. editing
 
-`knowledge/sheets_sync.py` pushes the same tabs via `gspread` using a service-account credential
-(`GOOGLE_SERVICE_ACCOUNT_FILE` env var — never commit this file; it's in `.gitignore`). The sync
-is one-directional (xlsx → Sheets) for the MVP — Sheets is for human review, not concurrent
-editing. If Bruno edits the Sheet directly, that edit is not pulled back automatically; flag this
-limitation in the CLI output after `cvpal sync`.
+`cvpal kb build` re-runs every extraction call and overwrites the structured sections — only run
+it when new CVs are added to the source corpus. Between rebuilds, `data/knowledge-base.md` is
+meant to be hand-edited directly (fix a row, adjust a skill's seniority, correct a translation) —
+the markdown table format was chosen specifically so both a human and any future agent converge
+on the same file through the same shape.
 
 ## Testing
 
-- Unit-test the dedupe/fuzzy-match logic with small synthetic `RawDocument` fixtures covering:
-  exact duplicate, near-duplicate wording, genuinely different roles that share a company name.
-- Unit-test translation only for the *plumbing* (does the field get replaced, is
-  `source_language` preserved) — do not assert on exact translated wording, that's an LLM
-  integration test, not a unit test, and belongs behind a `--live` pytest marker that hits the
-  real API.
+- Unit-test `dedupe.py` with small synthetic `RawDocument` fixtures: exact duplicate,
+  near-duplicate wording, genuinely different lines.
+- Unit-test `personal_data_resolution.py` against the corpus's actual known-inconsistent values
+  (see `tests/application/test_personal_data_resolution.py`) — this is the one place a
+  substring-matching bug silently mis-tags data (e.g. "-dev" matching inside "-developer"), so
+  keep exact-match assertions, not just "doesn't crash".
+- Unit-test `build_knowledge_base()` end-to-end with a `FakeTextAgent` scripted with realistic
+  JSON responses (see `tests/application/test_build_knowledge_base.py`) — no live agent call in
+  the automated suite.
+- Unit-test `markdown_knowledge_repository.py`'s save→load roundtrip, including a hand-edited
+  file (added row, extra whitespace) to confirm the parser tolerates manual edits.

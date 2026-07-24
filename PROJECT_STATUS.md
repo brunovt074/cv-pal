@@ -3,9 +3,10 @@
 ## Vision
 
 Consolidate ~50 scattered CV/cover-letter documents (PDF/DOCX/ODT, multiple stacks: Java, PHP,
-C#, JS, Python) into a single English-language knowledge base spreadsheet, then use that base to
-generate 100%-tailored CVs and cover letters per job posting, and assisted drafts for freelance
-platform profiles — all in Bruno's own writing voice.
+C#, JS, Python) into a single English-language knowledge base, then use that base to generate
+100%-tailored CVs and cover letters per job posting, and assisted drafts for freelance platform
+profiles — all in Bruno's own writing voice, via an agent-agnostic core (opencode today, any
+other agent tomorrow).
 
 ---
 
@@ -14,24 +15,27 @@ platform profiles — all in Bruno's own writing voice.
 | Component | Choice |
 |-----------|--------|
 | Language | Python 3.12 |
-| AI (text tasks: translation, dedupe/structuring, voice) | `opencode` CLI subprocess, `opencode-go/deepseek-v4-pro` |
-| AI (document generation, Fase 4) | Anthropic Python SDK, `claude-opus-4-8` — Agent Skills/`web_fetch` have no opencode equivalent |
+| Architecture | Hexagonal (ports & adapters) — see `AGENTS.md` |
+| AI engine | Provider-agnostic `TextCompletionPort`. Default adapter: `opencode` CLI, model `opencode-go/deepseek-v4-pro`. Second adapter (Claude Code CLI) exists to prove the abstraction |
 | Document parsing | pdfplumber (+ hyperlink extraction), python-docx, odfpy, `pdftotext -layout` fallback |
-| Data / sheet | pandas, openpyxl |
+| Knowledge base | `data/knowledge-base.md` (source of truth) + optional `data/cv-knowledge-base.xlsx` export |
+| Data / sheet export | pandas, openpyxl |
 | Sheets sync | gspread + service account (not yet implemented) |
-| Document generation | Claude Agent Skills (`docx`/`pdf`) via code execution container (Fase 4) |
-| API / CLI | FastAPI + Typer |
+| Document generation (`.docx`/`.pdf`) | Not yet wired — needs a `DocumentRenderPort` adapter |
+| API / CLI | FastAPI (planned) + Typer (`src/cvpal/interfaces/cli/`) |
 
-See AGENTS.md Decision Log for why text-generation tasks use `opencode`/DeepSeek instead of the
-Anthropic SDK directly (explicit user decision, confirmed mid-session).
+See `AGENTS.md`'s Architecture section for the layer breakdown and the agent-agnosticism
+mechanism, and its Decision Log for the reasoning behind each choice below.
 
 ---
 
 ## Development Rules
 
 - No comments in production code
-- English identifiers; knowledge base content in English (translated on-the-fly at generation time)
+- English identifiers; knowledge base content in English (translated on-the-fly at tailoring time)
 - Type hints + pydantic models at every module boundary
+- `domain` has zero infrastructure imports; `application` depends only on `domain`; only
+  `container.py` wires infrastructure adapters to use cases
 - Feature branch workflow only, never commit to `master`
 
 ---
@@ -43,98 +47,104 @@ Current chain:
 ```
 master
   <- feature/initial-config
-      <- feature/data-pipeline   (current)
+      <- feature/data-pipeline        (ingest + legacy .xlsx analytics — superseded by below)
+          <- feature/hexagonal-agents (current — ports & adapters, agent-agnostic core,
+                                        markdown KB, voice profile, tailoring)
 ```
 
 ### Branch Intent
 
 - `master`: empty baseline
-- `feature/initial-config`: scaffold, AGENTS.md, PROJECT_STATUS.md, skills, governance layer
-- `feature/data-pipeline` (current): ingestion + analytics + knowledge base workbook (the MVP deliverable)
-- `feature/voice-profile` (next): style guide extraction from cover letters
-- `feature/generation-engine` (after): CV/cover-letter tailoring per job posting
+- `feature/initial-config`: scaffold, `AGENTS.md`, `PROJECT_STATUS.md`, skills, governance layer
+- `feature/data-pipeline`: original ingestion + `.xlsx`-centric analytics (MVP v1) — kept in
+  history, its ingestion logic was carried forward, its analytics/knowledge modules were replaced
+- `feature/hexagonal-agents` (current): full hexagonal restructure; provider-agnostic agent
+  layer (`CliAgentSpec` + registry); `data/knowledge-base.md` as the new source of truth
+  (personal data, summary, experience, education, certifications, skills, projects, languages,
+  voice profile — voice extraction folded in, no separate stage); CV tailoring against a job
+  posting given as text or a local file
+- `feature/generation-engine` (next): a `DocumentRenderPort` adapter for real `.docx`/`.pdf`
+  output, and a `WebContentPort` adapter so job postings can be given by URL
 - `feature/freelance-profiles` (after): assisted profile drafts per platform
-- `feature/web-job-search` (future iteration): autonomous job search via web search / scheduled agents
+- `feature/web-job-search` (future iteration): autonomous job search via web search / scheduled
+  agents
 
 ---
 
 ## Current State
 
-### Scaffold [COMPLETE]
-**Branch**: `feature/initial-config`
+### Hexagonal restructure + agent-agnostic core [COMPLETE]
+**Branch**: `feature/hexagonal-agents`
 
-- Directory structure, `pyproject.toml`, `.gitignore`, `.env.example`
-- `AGENTS.md`, `PROJECT_STATUS.md`, `CLAUDE.md`, `README.md`
-- All 7 `skills/*/SKILL.md`
-- `.engram/config.json` (`project_name: cv-pal`) so future sessions resolve engram without
-  ambiguity — this session's MCP server cwd is fixed at `/home/br1/cv` (ambiguous: two git
-  children `cv/`, `php/`), so engram memory could not be written under `cv-pal` this run
+- `domain/`: pydantic models (`documents`, `knowledge`, `jobs`, `generation`), ports as
+  `typing.Protocol` (`text_completion`, `document_render`, `web_content`,
+  `knowledge_repository`, `raw_document_repository`, `document_parser`, `job_posting_source`,
+  `checkpoint_store`), `Capability` enum, error hierarchy.
+- `infrastructure/agents/`: `CliAgentSpec` (declarative shape for any subprocess-driven agent) +
+  one generic `CliAgentAdapter`. Two concrete specs: `opencode` (default) and `claude-code`
+  (proves the abstraction generalizes). Registry + `container.py` resolve the active provider
+  from `CVPAL_AGENT` and fail fast (`CapabilityNotSupportedError`) if it lacks a capability a use
+  case needs.
+- `infrastructure/parsers/`: PDF/DOCX/ODT extraction + section detection, moved from the original
+  `ingest/` package with zero logic changes (all bugs fixed there previously — layout-aware
+  whitespace ratio, double-spaced header collapsing — carried forward intact).
+- `infrastructure/persistence/`: `MarkdownKnowledgeRepository` (the new source-of-truth
+  read/write), `JsonRawDocumentRepository`, `FileCheckpointStore`, `XlsxExporter` (optional
+  secondary export), `cv_version_inventory` (deterministic, feeds the xlsx export only).
+- **Result on the real corpus**: `cvpal ingest` against `/home/br1/cv/` still gets 48/48 source
+  files, 0 extraction warnings, 0 undetected languages — the parser move didn't regress anything.
+- 79 tests (up from 33), all pure/deterministic or backed by a `FakeTextAgent` — zero live LLM
+  calls in the automated suite. `ruff check` clean.
 
-### Ingestion [COMPLETE]
-**Branch**: `feature/data-pipeline`
+### Knowledge base build [COMPLETE, verified against the real corpus]
+**Branch**: `feature/hexagonal-agents`
 
-- `src/cvpal/ingest/`: PDF (pdfplumber + `pdftotext -layout` fallback), DOCX (python-docx), ODT
-  (odfpy) extractors, dispatched by extension in `ingest_all()`.
-- Section detection (`sections.py`) via ES/EN keyword matching on header lines (including a
-  dedicated `links` section); language detection via header keywords with a stopword-ratio
-  fallback for header-less prose (cover letters).
-- **Hyperlink extraction**: all three formats expose real link targets (LinkedIn/GitHub/project
-  URLs) separately from the text layer (PDF page annotations, DOCX/ODT relationship targets) -
-  plain-text extraction alone only sees the anchor text ("LinkedIn", not the URL). Appended as a
-  `Links:` block so PersonalData ends up with actual URLs, not link labels.
-- **Result on the real corpus**: 48/48 source files ingested with zero crashes, 0 extraction
-  warnings, 0 undetected languages. 37/38 CVs got full section coverage; 1 CV has no section
-  headers at all in its source layout and correctly falls back to the `unstructured` bucket.
-- Fixed two real bugs found during verification: (1) `pdfplumber(layout=True)` pads output with
-  large whitespace runs that broke the alpha-ratio "garbled text" heuristic and the
-  LibreOffice-as-txt-converter fallback (LibreOffice treats standalone PDFs as Draw documents and
-  fails to save as text) — replaced with `pdftotext -layout` and a whitespace-aware ratio; (2)
-  `layout=True` sometimes double-spaces header text ("Resumen  Profesional"), breaking substring
-  keyword matching — fixed by collapsing whitespace runs before comparing.
+- `application/use_cases/build_knowledge_base.py`: one agent call per canonical section
+  (personal_data, summary, experience, education+certifications, skills, projects, languages,
+  voice_profile), each returning JSON validated against a `domain/knowledge/models.py` model —
+  never markdown text directly. Checkpointed per section (`data/.checkpoints/`) so a killed run
+  resumes.
+- `application/services/personal_data_resolution.py`: deterministic correction pass — which
+  phone/LinkedIn/GitHub value is current is a hardcoded fact (confirmed by Bruno), never an
+  agent guess. A real substring-matching bug was caught and fixed here during implementation
+  ("bruno-vargas-tettamanti-dev" was matching inside "...-developer" via naive substring
+  containment) — now compares normalized full identifiers.
+- `infrastructure/persistence/markdown_knowledge_repository.py`: renders/parses
+  `data/knowledge-base.md` as one markdown table per section + a free-form `Notes` section
+  preserved verbatim across rebuilds. Tolerant of hand-added rows on reload.
+- `application/use_cases/audit_knowledge_base.py` + `cvpal kb audit`: reports personal-data
+  fields with more than one distinct value, so the correction pass's output is visible, not just
+  silently applied.
+- **Run against the real corpus** (`/home/br1/cv/`, via the `opencode` adapter): produced
+  `data/knowledge-base.md` covering personal data (name/phone/email/location/headline/
+  LinkedIn/GitHub/projects/portfolio links, with the known-current phone `+5493772566242`,
+  LinkedIn `bruno-vargas-tettamanti-dev`, and GitHub `brunovt074` correctly tagged `(current)`
+  against older variants tagged `(previous)`), summary variants, experience bullets, education,
+  certifications, skills, projects, languages, and a voice profile extracted from the cover
+  letters. One known pre-existing extraction artifact (a UTN certificate URL, corrupted by two
+  concatenated links in the source PDF) was deferred, not silently fixed — flagged for a manual
+  pass later.
 
-### Data Analytics + Knowledge Base Workbook [COMPLETE — MVP DELIVERABLE SHIPPED]
-**Branch**: `feature/data-pipeline`
+### CV tailoring [COMPLETE for text/file postings; URL and real-document output deferred]
+**Branch**: `feature/hexagonal-agents`
 
-- `analytics/dedupe.py`: mechanical (non-LLM) line-level dedup across all 38 CV versions before
-  any LLM call — cut raw volume from ~281K to ~70K chars, and this is what makes each per-section
-  LLM call small/fast/reliable.
-- `analytics/structure.py`: one LLM call per canonical section (personal_data, summary,
-  experience, education+certifications, skills, projects, languages) - translates to English,
-  merges near-duplicate facts, extracts structured fields (company/role/dates for experience,
-  category for skills, etc). Split per-section rather than one giant call - see Decision Log.
-- `analytics/cover_letters.py`: translates all 10 cover letters to English, preserving the
-  original text alongside (needed by the upcoming voice-style skill).
-- `analytics/cv_versions.py`: deterministic inventory of all 38 CV files, grouped by stack
-  (top-level folder), flagging the most-recently-modified file per stack.
-- `analytics/checkpoint.py`: every LLM step's result is cached to `data/.checkpoints/` (gitignored)
-  so `cvpal build-sheet` can be re-run in short bursts and resume instead of re-paying completed
-  calls — necessary because the full pipeline exceeds the harness's ~10min background execution
-  ceiling in one shot.
-- `knowledge/workbook.py`: builds `data/cv-knowledge-base.xlsx` with all 11 tabs (PersonalData,
-  Summary, Experience, Education, Certifications, Skills, Projects, Languages, CVVersions,
-  CoverLetters, VoiceProfile-placeholder). **This file is committed to git** — per the Decision
-  Log it's the source of truth, not a build artifact.
-- **Result on the real corpus**: 12 personal data fields (incl. real LinkedIn/GitHub/project
-  URLs — 2 different GitHub usernames and phone numbers found across CV history, both preserved
-  as distinct facts, not silently merged), 5 summary variants, 43 experience bullets cleanly
-  grouped by company/role/dates, 2 education entries, 3 certifications (including one recent one
-  — a Sui blockchain bootcamp — not previously noticed), 113 skills categorized, 3 projects, 3
-  languages, 38 CV versions tracked, 10 cover letters translated.
-- Fixed a real bug during verification: uncapped `source_files` provenance lists blew up JSON
-  output size for near-universal facts (e.g. "Java" appearing in 30+ of 38 files), truncating
-  the LLM response mid-string. Capped at 3 representative files per record.
-- 33 tests total (added `test_dedupe.py`, `test_checkpoint.py`, `test_cv_versions.py`,
-  `test_workbook.py` — all pure/deterministic, no LLM calls in the automated suite). `ruff check`
-  clean.
-- **Not yet implemented**: Google Sheets sync (`cvpal sync` / `knowledge/sheets_sync.py`) - the
-  `.xlsx` is the shipped deliverable; Sheets sync is the next small addition if needed.
+- `application/use_cases/tailor_cv.py` + `application/prompts/tailoring.py`: given a job posting
+  and the knowledge base markdown, produces a tailored CV in markdown, selecting only relevant
+  material (never fabricating), in a language inferred from the posting (or overridden).
+- `infrastructure/job_postings/`: `InlineTextJobPostingSource` (`--job-text`),
+  `FileJobPostingSource` (`--job-file`, `.txt`/`.md`/`.docx`), `UrlJobPostingSource` (raises
+  `CapabilityNotSupportedError` until a `WebContentPort` adapter exists — not opencode's fault
+  per se, see `AGENTS.md`).
+- `cvpal tailor` CLI command wires it end-to-end, writing to `data/outputs/`.
+- **Not yet implemented**: real `.docx`/`.pdf` output (needs `DocumentRenderPort`), job posting
+  by URL (needs `WebContentPort`), a separate cover-letter use case.
 
 ### Not started
-- Google Sheets sync (small addition to Fase 2, can be picked up anytime)
-- Voice profile extraction (Fase 3) — **next up**
-- Generation engine (Fase 4)
-- Freelance profiles (Fase 5)
-- Web job search (Fase 6, future)
+- Google Sheets sync (small addition, can be picked up anytime)
+- `DocumentRenderPort` + `WebContentPort` adapters (Fase: `feature/generation-engine`)
+- Cover-letter tailoring (mirrors `tailor_cv.py`)
+- Freelance profiles
+- Web job search (future iteration)
 
 ---
 
@@ -150,20 +160,38 @@ pytest
 
 ```bash
 source .venv/bin/activate
-python -u -m cvpal.cli ingest         # re-parse all source docs (fast, no LLM)
-python -u -m cvpal.cli build-sheet    # structure + translate + build workbook (calls opencode/DeepSeek)
+cvpal ingest              # re-parse all source docs (fast, no agent calls)
+cvpal kb build            # extract + validate + render data/knowledge-base.md (calls the configured agent)
 ```
 
-`build-sheet` may need to be re-run 2-3 times if killed by an external time limit - it resumes
-from `data/.checkpoints/` automatically. Delete that directory to force a full recompute (e.g.
-after changing a structuring prompt).
+`kb build` may need to be re-run if killed by an external time limit — it resumes from
+`data/.checkpoints/` automatically. Delete that directory to force a full recompute (e.g. after
+changing an extraction prompt).
+
+## Tailoring a CV
+
+```bash
+cvpal tailor --job-text "Backend Java developer, Spring Boot, remote"
+cvpal tailor --job-file /path/to/posting.docx --language es
+```
+
+## Switching agent provider
+
+```bash
+export CVPAL_AGENT=claude-code   # or opencode (default)
+cvpal agents list                # see what's registered
+cvpal agents check                # round-trip a trivial prompt against the active one
+```
 
 ---
 
 ## Next Actions
 
-1. Voice profile extraction (Fase 3): `src/cvpal/voice/style_guide.py` reading the `CoverLetters`
-   tab, producing `data/voice-profile.md` + populating the `VoiceProfile` tab.
-2. Optionally: Google Sheets sync before moving on, if Bruno wants to review/edit in Sheets now.
-3. Generation engine (Fase 4) — first real use of the Anthropic SDK in this project (Agent
-   Skills for `.docx`/`.pdf` output, `web_fetch` for the job posting URL).
+1. `DocumentRenderPort` adapter (Anthropic SDK + Agent Skills, or another mechanism) for real
+   `.docx`/`.pdf` tailored output — first real use of a non-CLI agent in this project.
+2. `WebContentPort` adapter so job postings can be given by URL.
+3. Fix the UTN certificate URL extraction artifact in `data/knowledge-base.md` (deferred, not
+   blocking).
+4. Optionally: Google Sheets sync from the `.xlsx` export, if useful for manual review.
+5. Cover-letter tailoring use case, freelance profiles, web job search — in that order per the
+   branch chain above.

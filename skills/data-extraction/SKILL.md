@@ -2,13 +2,20 @@
 
 ## Scope
 
-`src/cvpal/ingest/` — turning raw CV/cover-letter files (PDF, DOCX, ODT) into normalized,
-structured pydantic records. This is the first stage of the pipeline; nothing downstream should
-ever touch a raw file directly.
+`src/cvpal/infrastructure/parsers/` (extractors, section detection) and
+`src/cvpal/application/use_cases/ingest_documents.py` (orchestration) — turning raw
+CV/cover-letter files (PDF, DOCX, ODT) into normalized, structured pydantic records
+(`domain/documents/models.py:RawDocument`). This is the first stage of the pipeline; nothing
+downstream should ever touch a raw file directly.
+
+The whole mechanism (discovery + per-format extraction) is one `DocumentParserPort` implementation
+(`infrastructure/parsers/dispatch.py:MultiFormatDocumentParser`), injected into the use case —
+see `AGENTS.md`'s hexagonal architecture section before changing the shape of this boundary.
 
 ## When to read this skill
 
-Before creating or modifying any extractor, parser, or section-detection logic under `ingest/`.
+Before creating or modifying any extractor, parser, or section-detection logic under
+`infrastructure/parsers/`.
 
 ## Principles
 
@@ -39,8 +46,9 @@ Every extractor returns a `RawDocument` (pydantic model) with:
 - `unstructured: str | None` — fallback bucket when section detection fails
 
 Parsing `sections` into typed records (Experience, Education, Skills, …) happens in
-`analytics/`, not here — keep ingestion dumb and mechanical, keep interpretation in analytics
-where it can be tested against the full corpus at once.
+`application/use_cases/build_knowledge_base.py` via an agent call, not here — keep ingestion dumb
+and mechanical, keep interpretation where it can be tested against the full corpus at once with a
+`FakeTextAgent` (see `data-analytics` skill).
 
 ## Testing
 
