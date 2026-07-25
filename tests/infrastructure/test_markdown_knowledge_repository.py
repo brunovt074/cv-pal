@@ -109,3 +109,17 @@ def test_exists_reflects_filesystem(tmp_path):
     assert repo.exists() is False
     repo.save(_sample_kb())
     assert repo.exists() is True
+
+
+def test_backup_copies_current_content_to_a_new_file(tmp_path):
+    path = tmp_path / "kb.md"
+    repo = MarkdownKnowledgeRepository(path)
+    repo.save(_sample_kb())
+    original_text = path.read_text()
+
+    backup_path = repo.backup()
+
+    assert backup_path != path
+    assert backup_path.exists()
+    assert backup_path.read_text() == original_text
+    assert path.read_text() == original_text  # original untouched

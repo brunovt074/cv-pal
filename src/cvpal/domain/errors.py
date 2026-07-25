@@ -29,3 +29,7 @@ class InvalidAgentResponseError(CvPalError):
 
 class KnowledgeBaseNotFoundError(CvPalError):
     pass
+
+
+class DocumentRenderError(CvPalError):
+    pass

@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from cvpal.application.services.checkpointing import fingerprint_text
 from cvpal.domain.documents.models import RawDocument
 
 
@@ -56,3 +57,15 @@ def dedupe_all_sections(
     documents: list[RawDocument], sections: list[str]
 ) -> dict[str, list[DedupedBlock]]:
     return {section: dedupe_section_lines(documents, section) for section in sections}
+
+
+def fingerprint_blocks(blocks: list[DedupedBlock]) -> str:
+    """Deterministic fingerprint of a section's deduped input - order of
+    `blocks` doesn't affect it, only their content, so it's stable across
+    runs regardless of dict-iteration order upstream.
+    """
+    normalized = "\n".join(
+        f"{b.text}|{','.join(sorted(b.source_files))}"
+        for b in sorted(blocks, key=lambda b: b.text)
+    )
+    return fingerprint_text(normalized)

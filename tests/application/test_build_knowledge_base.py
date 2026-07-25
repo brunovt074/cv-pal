@@ -29,6 +29,17 @@ _DOCS = [
     ),
 ]
 
+_ALL_SECTIONS = [
+    "personal_data",
+    "summaries",
+    "experience",
+    "education_certifications",
+    "skills",
+    "projects",
+    "languages",
+    "voice_profile",
+]
+
 _RESPONSES = [
     json.dumps([{"field": "name", "value": "Bruno Vargas Tettamanti", "source_files": ["a.pdf"]}]),
     json.dumps([{"variant_label": "Backend", "text": "Backend developer.", "source_files": ["a.pdf"]}]),
@@ -78,7 +89,8 @@ def test_build_knowledge_base_assembles_all_sections(tmp_path):
     agent = FakeTextAgent(list(_RESPONSES))
     store = FileCheckpointStore(tmp_path)
 
-    kb = build_knowledge_base(_DOCS, agent, "fake-agent", store)
+    report = build_knowledge_base(_DOCS, agent, "fake-agent", store)
+    kb = report.knowledge_base
 
     assert kb.personal_data[0].field == "name"
     assert kb.summaries[0].variant_label == "Backend"
@@ -90,6 +102,8 @@ def test_build_knowledge_base_assembles_all_sections(tmp_path):
     assert kb.languages[0].language == "English"
     assert kb.voice_profile is not None
     assert kb.voice_profile.tone_summary == ["direct", "enthusiastic"]
+    assert set(report.rebuilt_sections) == set(_ALL_SECTIONS)
+    assert report.skipped_sections == []
 
 
 def test_build_knowledge_base_resumes_from_checkpoints_without_recalling_agent(tmp_path):
@@ -98,7 +112,32 @@ def test_build_knowledge_base_resumes_from_checkpoints_without_recalling_agent(t
     build_knowledge_base(_DOCS, agent, "fake-agent", store)
 
     agent_second_run = FakeTextAgent([])  # would raise if called
-    kb = build_knowledge_base(_DOCS, agent_second_run, "fake-agent", store)
+    report = build_knowledge_base(_DOCS, agent_second_run, "fake-agent", store)
 
-    assert kb.personal_data[0].field == "name"
+    assert report.knowledge_base.personal_data[0].field == "name"
     assert agent_second_run.requests == []
+    assert report.rebuilt_sections == []
+    assert set(report.skipped_sections) == set(_ALL_SECTIONS)
+
+
+def test_build_knowledge_base_rebuilds_only_the_section_whose_input_changed(tmp_path):
+    agent = FakeTextAgent(list(_RESPONSES))
+    store = FileCheckpointStore(tmp_path)
+    build_knowledge_base(_DOCS, agent, "fake-agent", store)
+
+    changed_docs = [
+        _DOCS[0].model_copy(
+            update={"sections": {**_DOCS[0].sections, "skills": "Java, Spring Boot, PostgreSQL, Kotlin"}}
+        ),
+        _DOCS[1],
+    ]
+    agent_second_run = FakeTextAgent(
+        [json.dumps([{"skill": "Kotlin", "category": "language", "source_files": ["a.pdf"]}])]
+    )
+
+    report = build_knowledge_base(changed_docs, agent_second_run, "fake-agent", store)
+
+    assert report.rebuilt_sections == ["skills"]
+    assert set(report.skipped_sections) == set(_ALL_SECTIONS) - {"skills"}
+    assert report.knowledge_base.skills[0].skill == "Kotlin"
+    assert len(agent_second_run.requests) == 1

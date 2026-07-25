@@ -27,9 +27,18 @@ def strip_markdown_fence(text: str) -> str:
 
 
 def parse_json_response(agent_name: str, text: str) -> dict | list:
+    """Parse the first complete JSON value in the response.
+
+    Uses `raw_decode` rather than `json.loads` because agents occasionally
+    append trailing prose/commentary after a valid JSON value - a strict
+    `json.loads` rejects the whole response as "Extra data" even though the
+    JSON itself is fine. `raw_decode` stops at the end of the first value
+    and ignores whatever comes after.
+    """
     stripped = strip_markdown_fence(text)
     try:
-        return json.loads(stripped)
+        value, _end = json.JSONDecoder().raw_decode(stripped)
+        return value
     except json.JSONDecodeError as exc:
         raise InvalidAgentResponseError(
             agent_name, f"response was not valid JSON: {exc}", raw_response=stripped[:2000]

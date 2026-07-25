@@ -12,6 +12,13 @@ from __future__ import annotations
 
 from cvpal.application.services.dedupe import DedupedBlock
 
+PROMPT_VERSION = "v1"
+"""Bump when any prompt in this module changes wording - included in the
+checkpoint fingerprint (see application/services/checkpointing.py) so an
+edited prompt invalidates cached results instead of silently reusing
+output generated under the old wording.
+"""
+
 _COMMON_RULES = """\
 Rules:
 - ALL output text MUST be in English, regardless of source language. \

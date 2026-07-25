@@ -15,10 +15,12 @@ from __future__ import annotations
 
 import re
 import typing
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pydantic import BaseModel
 
+from cvpal.application.services.markdown_sections import extract_section_block
 from cvpal.domain.knowledge.models import (
     CertificationEntry,
     EducationEntry,
@@ -147,12 +149,6 @@ def _rows_to_models(raw_rows: list[dict[str, str]], model_type: type[BaseModel])
     return results
 
 
-def _extract_section_block(text: str, key: str) -> str | None:
-    pattern = rf"<!-- cvpal:section={re.escape(key)} -->(.*?)<!-- /cvpal:section -->"
-    match = re.search(pattern, text, re.DOTALL)
-    return match.group(1) if match else None
-
-
 def _parse_voice_profile(block: str) -> VoiceProfile | None:
     raw_rows = _parse_table(block)
     if not raw_rows:
@@ -168,6 +164,41 @@ def _parse_voice_profile(block: str) -> VoiceProfile | None:
     return VoiceProfile.model_validate(data) if data else None
 
 
+def render_markdown(knowledge_base: KnowledgeBase) -> str:
+    """Pure rendering, no I/O - reused by the repository's `save()` and by
+    callers (e.g. the MCP server) that need the text without touching disk.
+    """
+    parts = [_HEADER]
+    for key, heading, model_type in _SECTIONS:
+        rows = getattr(knowledge_base, key)
+        parts.append(_render_section(key, heading, rows, model_type))
+    parts.append(_render_voice_profile(knowledge_base.voice_profile))
+    parts.append(_NOTES_MARKER + "\n## Notes\n\n" + (knowledge_base.notes or "_(none)_"))
+    return "\n\n".join(parts) + "\n"
+
+
+def parse_markdown(text: str) -> KnowledgeBase:
+    """Pure parsing, no I/O - reused by the repository's `load()` and by
+    callers that need to validate a candidate document before writing it
+    (see application/use_cases/update_knowledge_base.py). Tolerant of hand
+    edits (added/removed rows, extra whitespace).
+    """
+    kwargs: dict[str, object] = {}
+    for key, _heading, model_type in _SECTIONS:
+        block = extract_section_block(text, key)
+        raw_rows = _parse_table(block) if block else []
+        kwargs[key] = _rows_to_models(raw_rows, model_type)
+
+    voice_block = extract_section_block(text, "voice_profile")
+    kwargs["voice_profile"] = _parse_voice_profile(voice_block) if voice_block else None
+
+    notes_match = re.search(re.escape(_NOTES_MARKER) + r"\n## Notes\n\n(.*)$", text, re.DOTALL)
+    notes = notes_match.group(1).strip() if notes_match else ""
+    kwargs["notes"] = "" if notes == "_(none)_" else notes
+
+    return KnowledgeBase(**kwargs)
+
+
 class MarkdownKnowledgeRepository:
     def __init__(self, path: Path) -> None:
         self._path = path
@@ -176,29 +207,19 @@ class MarkdownKnowledgeRepository:
         return self._path.exists()
 
     def save(self, knowledge_base: KnowledgeBase) -> None:
-        parts = [_HEADER]
-        for key, heading, model_type in _SECTIONS:
-            rows = getattr(knowledge_base, key)
-            parts.append(_render_section(key, heading, rows, model_type))
-        parts.append(_render_voice_profile(knowledge_base.voice_profile))
-        parts.append(_NOTES_MARKER + "\n## Notes\n\n" + (knowledge_base.notes or "_(none)_"))
-
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text("\n\n".join(parts) + "\n")
+        self._path.write_text(render_markdown(knowledge_base))
 
     def load(self) -> KnowledgeBase:
-        text = self._path.read_text()
-        kwargs: dict[str, object] = {}
-        for key, _heading, model_type in _SECTIONS:
-            block = _extract_section_block(text, key)
-            raw_rows = _parse_table(block) if block else []
-            kwargs[key] = _rows_to_models(raw_rows, model_type)
+        return parse_markdown(self._path.read_text())
 
-        voice_block = _extract_section_block(text, "voice_profile")
-        kwargs["voice_profile"] = _parse_voice_profile(voice_block) if voice_block else None
-
-        notes_match = re.search(re.escape(_NOTES_MARKER) + r"\n## Notes\n\n(.*)$", text, re.DOTALL)
-        notes = notes_match.group(1).strip() if notes_match else ""
-        kwargs["notes"] = "" if notes == "_(none)_" else notes
-
-        return KnowledgeBase(**kwargs)
+    def backup(self) -> Path:
+        """Copies the current file to a timestamped sibling path and
+        returns it - called before an agent-initiated overwrite
+        (update_knowledge_base) so the previous version is always
+        recoverable.
+        """
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        backup_path = self._path.with_name(f"{self._path.name}.bak-{timestamp}")
+        backup_path.write_text(self._path.read_text())
+        return backup_path

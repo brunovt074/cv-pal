@@ -6,6 +6,9 @@ from __future__ import annotations
 
 from cvpal.domain.documents.models import RawDocument
 
+PROMPT_VERSION = "v1"
+"""See application/prompts/extraction.py:PROMPT_VERSION."""
+
 
 def voice_profile_prompt(letters: list[RawDocument]) -> str:
     parts = []

@@ -16,3 +16,9 @@ class RawDocument(BaseModel):
     sections: dict[str, str] = Field(default_factory=dict)
     unstructured: str | None = None
     extraction_warnings: list[str] = Field(default_factory=list)
+    source_mtime: float = Field(
+        default=0.0,
+        description="mtime of source_file at extraction time - lets ingest_documents skip "
+        "re-parsing a file that hasn't changed since the last run.",
+    )
+    source_size: int = Field(default=0, description="Size in bytes of source_file at extraction time.")

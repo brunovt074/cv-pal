@@ -11,6 +11,7 @@ from typing import Callable
 from cvpal.config import Settings, get_settings
 from cvpal.domain.capabilities import Capability
 from cvpal.domain.errors import CapabilityNotSupportedError
+from cvpal.domain.knowledge.models import KnowledgeBase
 from cvpal.domain.ports.job_posting_source import JobPostingSourcePort
 from cvpal.domain.ports.text_completion import TextCompletionPort
 from cvpal.infrastructure.agents.registry import available_agents, build_agent
@@ -25,7 +26,9 @@ from cvpal.infrastructure.persistence.json_raw_document_repository import (
 )
 from cvpal.infrastructure.persistence.markdown_knowledge_repository import (
     MarkdownKnowledgeRepository,
+    parse_markdown,
 )
+from cvpal.infrastructure.rendering.local_document_renderer import LocalDocumentRenderer
 
 
 class Container:
@@ -73,6 +76,14 @@ class Container:
     @property
     def detect_language(self) -> Callable[[str], str]:
         return detect_language
+
+    @property
+    def parse_knowledge_base_markdown(self) -> Callable[[str], KnowledgeBase]:
+        return parse_markdown
+
+    @property
+    def document_renderer(self) -> LocalDocumentRenderer:
+        return LocalDocumentRenderer()
 
     def job_posting_source(
         self, *, text: str | None = None, file: Path | None = None, url: str | None = None
