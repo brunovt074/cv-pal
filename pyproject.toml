@@ -47,3 +47,13 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+# Pinned explicitly (ruff's own defaults expand across versions) so lint
+# results are reproducible regardless of which ruff a contributor has
+# installed - these are ruff's long-standing stable defaults: pycodestyle
+# errors (E4/E7/E9) and Pyflakes (F).
+select = ["E4", "E7", "E9", "F"]
