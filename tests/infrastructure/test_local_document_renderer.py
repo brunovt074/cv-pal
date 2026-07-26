@@ -25,7 +25,7 @@ def _hyperlinks(paragraph):
     return links
 
 _SAMPLE_MARKDOWN = """\
-# Bruno Vargas Tettamanti
+# Alex Doe
 
 ## Summary
 
@@ -45,7 +45,7 @@ _SOFFICE_AVAILABLE = shutil.which("soffice") is not None
 def test_markdown_to_docx_maps_headings():
     document = markdown_to_docx(_SAMPLE_MARKDOWN)
     headings = [p.text for p in document.paragraphs if p.style.name.startswith("Heading")]
-    assert "Bruno Vargas Tettamanti" in headings
+    assert "Alex Doe" in headings
     assert "Summary" in headings
     assert "Experience" in headings
     assert "Acme — Developer" in headings
@@ -91,20 +91,20 @@ def test_markdown_to_docx_uses_arial_as_default_font():
 
 def test_markdown_to_docx_renders_markdown_links_as_real_hyperlinks():
     document = markdown_to_docx(
-        "Reach me on [LinkedIn](https://www.linkedin.com/in/bruno-vargas-tettamanti-dev)."
+        "Reach me on [LinkedIn](https://www.linkedin.com/in/alex-doe-dev)."
     )
     paragraph = document.paragraphs[0]
     links = _hyperlinks(paragraph)
-    assert links == [("LinkedIn", "https://www.linkedin.com/in/bruno-vargas-tettamanti-dev")]
+    assert links == [("LinkedIn", "https://www.linkedin.com/in/alex-doe-dev")]
     assert "[LinkedIn]" not in paragraph.text
     assert paragraph.text.endswith(".")
 
 
 def test_markdown_to_docx_renders_bare_urls_as_real_hyperlinks():
-    document = markdown_to_docx("GitHub: https://github.com/brunovt074, always up to date.")
+    document = markdown_to_docx("GitHub: https://github.com/alexdoe, always up to date.")
     paragraph = document.paragraphs[0]
     links = _hyperlinks(paragraph)
-    assert links == [("https://github.com/brunovt074", "https://github.com/brunovt074")]
+    assert links == [("https://github.com/alexdoe", "https://github.com/alexdoe")]
     assert paragraph.text.endswith("always up to date.")
 
 
@@ -123,7 +123,7 @@ def test_render_docx_format_produces_openable_document(tmp_path):
     assert result == output
     assert output.exists()
     reopened = Document(str(output))
-    assert any("Bruno Vargas Tettamanti" in p.text for p in reopened.paragraphs)
+    assert any("Alex Doe" in p.text for p in reopened.paragraphs)
 
 
 @pytest.mark.skipif(not _SOFFICE_AVAILABLE, reason="soffice not installed")
@@ -139,16 +139,16 @@ def test_render_pdf_format_produces_a_real_pdf(tmp_path):
 
 def test_extract_docx_hyperlinks_returns_text_url_pairs():
     markdown = (
-        "Reach me on [LinkedIn](https://www.linkedin.com/in/bruno-vargas-tettamanti-dev) "
-        "or check [GitHub](https://github.com/brunovt074)."
+        "Reach me on [LinkedIn](https://www.linkedin.com/in/alex-doe-dev) "
+        "or check [GitHub](https://github.com/alexdoe)."
     )
     document = markdown_to_docx(markdown)
     docx_path = Path("/tmp/_extract_docx_hyperlinks.docx")
     document.save(docx_path)
 
     pairs = extract_docx_hyperlinks(docx_path)
-    assert ("LinkedIn", "https://www.linkedin.com/in/bruno-vargas-tettamanti-dev") in pairs
-    assert ("GitHub", "https://github.com/brunovt074") in pairs
+    assert ("LinkedIn", "https://www.linkedin.com/in/alex-doe-dev") in pairs
+    assert ("GitHub", "https://github.com/alexdoe") in pairs
 
 
 def test_extract_docx_hyperlinks_ignores_plain_paragraphs():
@@ -164,8 +164,8 @@ def test_render_pdf_preserves_hyperlinks_as_clickable_annotations(tmp_path):
     renderer = LocalDocumentRenderer()
     output = tmp_path / "cv.pdf"
     markdown = (
-        "Contact: [LinkedIn](https://www.linkedin.com/in/bruno-vargas-tettamanti-dev) "
-        "and [GitHub](https://github.com/brunovt074).\n"
+        "Contact: [LinkedIn](https://www.linkedin.com/in/alex-doe-dev) "
+        "and [GitHub](https://github.com/alexdoe).\n"
     )
     renderer.render(markdown, document_format=DocumentFormat.PDF, output_path=output)
 
@@ -178,8 +178,8 @@ def test_render_pdf_preserves_hyperlinks_as_clickable_annotations(tmp_path):
         and annot.get_object().get("/A", {}).get("/S") == "/URI"
     )
     assert link_uris == [
-        "https://github.com/brunovt074",
-        "https://www.linkedin.com/in/bruno-vargas-tettamanti-dev",
+        "https://github.com/alexdoe",
+        "https://www.linkedin.com/in/alex-doe-dev",
     ]
 
 

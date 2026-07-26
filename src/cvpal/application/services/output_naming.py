@@ -1,8 +1,12 @@
 """Build the conventional output filename for a tailored CV or cover letter.
 
-Convention (the user's choice, see PROJECT_STATUS for the why):
-    bruno-vargas-cv-{company-lowercase-slug}.{ext}      for CVs
-    bruno-vargas-cl-{company-lowercase-slug}.{ext}      for cover letters
+Convention:
+    {user-slug}-cv-{company-lowercase-slug}.{ext}      for CVs
+    {user-slug}-cl-{company-lowercase-slug}.{ext}      for cover letters
+
+`{user-slug}` identifies the author and is per-user - never hardcoded. It
+reads from CVPAL_USER_SLUG at call time, falling back to a placeholder
+identity if unset (see PROJECT_STATUS for the naming convention's why).
 
 The company name is normalized to a filesystem-safe slug: lowercased,
 whitespace and `.`/`,` collapsed to `-`, accents stripped, anything that
@@ -13,11 +17,12 @@ user to supply a real company name next time).
 
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
 
 _KIND_PREFIX = {"cv": "cv", "cover_letter": "cl"}
-_USER_SLUG = "bruno-vargas"
+_DEFAULT_USER_SLUG = "alex-doe"
 _FALLBACK_COMPANY = "untitled"
 
 _NON_SLUG_CHARS = re.compile(r"[^a-z0-9-]+")
@@ -55,4 +60,5 @@ def build_output_filename(*, kind: str, company: str, extension: str) -> str:
         raise ValueError(f"Unknown document kind: {kind!r}. Use 'cv' or 'cover_letter'.")
     prefix = _KIND_PREFIX[kind]
     slug = _slugify_company(company)
-    return f"{_USER_SLUG}-{prefix}-{slug}.{extension}"
+    user_slug = os.environ.get("CVPAL_USER_SLUG", _DEFAULT_USER_SLUG)
+    return f"{user_slug}-{prefix}-{slug}.{extension}"

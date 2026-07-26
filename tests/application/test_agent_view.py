@@ -11,9 +11,9 @@ from cvpal.domain.knowledge.voice import VoiceProfile
 def _kb_with_variants() -> KnowledgeBase:
     return KnowledgeBase(
         personal_data=[
-            PersonalDataField(field="phone", value="+5493772566242 (current)", source_files=["a.pdf", "b.pdf"]),
-            PersonalDataField(field="phone", value="+5492604101707 (previous)", source_files=["c.pdf"]),
-            PersonalDataField(field="email", value="brunodev.pdl@gmail.com", source_files=["a.pdf"]),
+            PersonalDataField(field="phone", value="+1-555-0100 (current)", source_files=["a.pdf", "b.pdf"]),
+            PersonalDataField(field="phone", value="+1-555-0199 (previous)", source_files=["c.pdf"]),
+            PersonalDataField(field="email", value="alex.doe@example.com", source_files=["a.pdf"]),
         ],
         experience=[
             ExperienceBullet(
@@ -35,8 +35,8 @@ def _kb_with_variants() -> KnowledgeBase:
 
 def test_agent_view_drops_previous_personal_data_variants():
     view = render_agent_view(_kb_with_variants())
-    assert "+5493772566242" in view
-    assert "+5492604101707" not in view
+    assert "+1-555-0100" in view
+    assert "+1-555-0199" not in view
     assert "(previous)" not in view
     assert "(current)" not in view  # marker itself is stripped once resolved
 

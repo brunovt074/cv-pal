@@ -35,7 +35,7 @@ Before creating or modifying any extractor, parser, or section-detection logic u
   headers is enough; do not spin up an LLM call per file just for this).
 - **Fail loud, not silent.** If a file cannot be parsed into any recognizable section, still emit
   a record with the raw text under an `unstructured` field and log a warning — never drop a
-  source file silently. Bruno needs to know which files did not extract cleanly.
+  source file silently. The author needs to know which files did not extract cleanly.
 
 ## Output contract
 

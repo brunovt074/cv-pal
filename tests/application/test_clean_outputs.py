@@ -8,11 +8,11 @@ def _seed_outputs(outputs_dir, names):
 
 
 def test_clean_outputs_deletes_single_named_file(tmp_path):
-    _seed_outputs(tmp_path, ["bruno-vargas-cv-proxify.pdf", "bruno-vargas-cv-other.docx"])
-    result = clean_outputs(outputs_dir=tmp_path, filename="bruno-vargas-cv-proxify.pdf", remove_all=False)
-    assert [p.name for p in result.deleted] == ["bruno-vargas-cv-proxify.pdf"]
-    assert (tmp_path / "bruno-vargas-cv-other.docx").exists()
-    assert not (tmp_path / "bruno-vargas-cv-proxify.pdf").exists()
+    _seed_outputs(tmp_path, ["alex-doe-cv-proxify.pdf", "alex-doe-cv-other.docx"])
+    result = clean_outputs(outputs_dir=tmp_path, filename="alex-doe-cv-proxify.pdf", remove_all=False)
+    assert [p.name for p in result.deleted] == ["alex-doe-cv-proxify.pdf"]
+    assert (tmp_path / "alex-doe-cv-other.docx").exists()
+    assert not (tmp_path / "alex-doe-cv-proxify.pdf").exists()
 
 
 def test_clean_outputs_remove_all_wipes_every_file(tmp_path):

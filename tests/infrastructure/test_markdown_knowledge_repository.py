@@ -13,8 +13,8 @@ from cvpal.infrastructure.persistence.markdown_knowledge_repository import (
 def _sample_kb() -> KnowledgeBase:
     return KnowledgeBase(
         personal_data=[
-            PersonalDataField(field="name", value="Bruno Vargas Tettamanti", source_files=["a.pdf"]),
-            PersonalDataField(field="phone", value="+5493772566242 (current)", source_files=["a.pdf", "b.pdf"]),
+            PersonalDataField(field="name", value="Alex Doe", source_files=["a.pdf"]),
+            PersonalDataField(field="phone", value="+1-555-0100 (current)", source_files=["a.pdf", "b.pdf"]),
         ],
         experience=[
             ExperienceBullet(
@@ -43,7 +43,7 @@ def test_save_creates_file(tmp_path):
     repo = MarkdownKnowledgeRepository(path)
     repo.save(_sample_kb())
     assert path.exists()
-    assert "# Bruno Vargas Tettamanti" in path.read_text()
+    assert "# Alex Doe" in path.read_text()
 
 
 def test_roundtrip_preserves_all_sections(tmp_path):
@@ -55,8 +55,8 @@ def test_roundtrip_preserves_all_sections(tmp_path):
     loaded = repo.load()
 
     assert loaded.personal_data[0].field == "name"
-    assert loaded.personal_data[0].value == "Bruno Vargas Tettamanti"
-    assert loaded.personal_data[1].value == "+5493772566242 (current)"
+    assert loaded.personal_data[0].value == "Alex Doe"
+    assert loaded.personal_data[1].value == "+1-555-0100 (current)"
     assert set(loaded.personal_data[1].source_files) == {"a.pdf", "b.pdf"}
 
     assert loaded.experience[0].company == "Acme"

@@ -11,8 +11,8 @@ _DOCS = [
         doc_kind="cv",
         source_language="en",
         sections={
-            "header": "Bruno Vargas Tettamanti\nBackend Developer",
-            "links": "linkedin: https://www.linkedin.com/in/bruno-vargas-tettamanti-dev/",
+            "header": "Alex Doe\nBackend Developer",
+            "links": "linkedin: https://www.linkedin.com/in/alex-doe-dev/",
             "summary": "Backend developer with Java experience.",
             "experience": "Developer - Acme - 01/2020 - Present\n- Built REST APIs",
             "education": "Tecnicatura en Sistemas - UTN",
@@ -41,7 +41,7 @@ _ALL_SECTIONS = [
 ]
 
 _RESPONSES = [
-    json.dumps([{"field": "name", "value": "Bruno Vargas Tettamanti", "source_files": ["a.pdf"]}]),
+    json.dumps([{"field": "name", "value": "Alex Doe", "source_files": ["a.pdf"]}]),
     json.dumps([{"variant_label": "Backend", "text": "Backend developer.", "source_files": ["a.pdf"]}]),
     json.dumps(
         [

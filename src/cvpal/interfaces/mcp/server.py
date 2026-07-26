@@ -275,8 +275,8 @@ def render_document(
     Two ways to name the file:
     - Pass kind="cv" (or "cover_letter") and company="<name>" and the
       tool will build the conventional file name for you
-      (bruno-vargas-cv-<slug>.{ext} for CVs,
-      bruno-vargas-cl-<slug>.{ext} for cover letters). This is the
+      (<your-slug>-cv-<company-slug>.{ext} for CVs,
+      <your-slug>-cl-<company-slug>.{ext} for cover letters). This is the
       recommended path - it keeps every output named the same way.
     - Or pass an explicit filename. Used only when you need to override
       the convention (e.g. debug dumps).

@@ -315,8 +315,8 @@ def test_render_document_builds_cv_filename_from_kind_and_company(tmp_path):
         kind="cv",
         company="Proxify",
     )
-    assert "bruno-vargas-cv-proxify.docx" in result
-    assert (container.settings.outputs_dir / "bruno-vargas-cv-proxify.docx").exists()
+    assert "alex-doe-cv-proxify.docx" in result
+    assert (container.settings.outputs_dir / "alex-doe-cv-proxify.docx").exists()
 
 
 def test_render_document_builds_cover_letter_filename_from_kind_and_company(tmp_path):
@@ -329,7 +329,7 @@ def test_render_document_builds_cover_letter_filename_from_kind_and_company(tmp_
         kind="cover_letter",
         company="Acme Corp",
     )
-    assert "bruno-vargas-cl-acme-corp.pdf" in result
+    assert "alex-doe-cl-acme-corp.pdf" in result
 
 
 def test_render_document_rejects_unknown_kind(tmp_path):

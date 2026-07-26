@@ -9,10 +9,10 @@ en inglés (`data/knowledge-base.md`), y luego cualquier agente de IA host (open
 lo consume vía MCP para redactar un CV y carta a medida de una oferta — conversacionalmente, en la
 voz del autor, solo con material real.
 
-**Decisión central**: el conocimiento es un archivo markdown versionado en git — cualquier agente
-lo lee nativamente, un humano lo edita a mano y lo diffea. El `.xlsx` es export opcional, no
-autoritativo. Bruno es el test fixture; el sistema recibe el usuario como parámetro, sin
-hardcodearlo.
+**Decisión central**: el conocimiento es un archivo markdown local (no versionado en git — es dato
+personal, ver `CV_DATA_DIR`) — cualquier agente lo lee nativamente, un humano lo edita a mano y lo
+diffea. El `.xlsx` es export opcional, no autoritativo. El maintainer del proyecto es el test
+fixture; el sistema recibe el usuario como parámetro, sin hardcodearlo.
 
 ---
 
@@ -85,7 +85,7 @@ Segunda corrida sin cambios = 0 llamadas, 0.26 s.
 El prompt de extracción devuelve **todos** los valores distintos de un campo (ej. tres teléfonos
 distintos de CVs de distintas épocas). `application/services/personal_data_resolution.py` aplica
 un pase determinístico posterior que marca exactamente uno como `(current)` y el resto como
-`(previous)`. Cuál es el valor vigente es un **hecho hardcodeado** (confirmado por Bruno), nunca
+`(previous)`. Cuál es el valor vigente es un **hecho hardcodeado** (solo el autor lo sabe), nunca
 un guess del agente.
 
 ---

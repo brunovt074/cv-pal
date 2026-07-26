@@ -1,6 +1,6 @@
 from cvpal.infrastructure.parsers.sections import detect_language, split_into_sections
 
-SPANISH_CV = """Bruno Vargas Tettamanti
+SPANISH_CV = """Alex Doe
 Backend Developer
 
 Resumen Profesional
@@ -17,7 +17,7 @@ Habilidades Técnicas
   - Java, Python.
 """
 
-ENGLISH_CV = """Bruno Vargas Tettamanti
+ENGLISH_CV = """Alex Doe
 Backend Developer
 
 Professional Summary
@@ -34,7 +34,7 @@ Technical Skills
   - Java, Python.
 """
 
-HEADERLESS_CV = """Bruno Vargas Tettamanti
+HEADERLESS_CV = """Alex Doe
 Backend developer with hands-on experience in Java and Python.
 Developer - Company X - 01/2020 - Present
 Did things.
@@ -72,5 +72,5 @@ def test_detect_language_english_from_headers():
 
 
 def test_detect_language_falls_back_to_stopwords_for_prose():
-    prose = "Mi nombre es Bruno y trabajé con mi equipo durante muchos años."
+    prose = "Mi nombre es Alex y trabajé con mi equipo durante muchos años."
     assert detect_language(prose) == "es"

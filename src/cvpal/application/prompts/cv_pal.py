@@ -24,12 +24,10 @@ are actually relevant to this posting - do not dump the entire history.
 
 _NAMING_CONVENTION = """\
 Output file naming (when the user asks to save a real file):
-- CV: bruno-vargas-cv-<company-slug>.<ext>     (e.g. bruno-vargas-cv-proxify.pdf)
-- Cover letter: bruno-vargas-cl-<company-slug>.<ext>
-Company slug = company name lowercased, whitespace/punctuation -> '-', \
-accents stripped. Use the render_document tool with kind="cv" or \
-kind="cover_letter" plus company="<name>" and it will construct the \
-correct file name for you. If the company is unnamed, use "untitled"."""
+Use the render_document tool with kind="cv" or kind="cover_letter" plus \
+company="<name>" and it will construct the correct file name for you, \
+following the user's configured naming convention - never build the \
+file name yourself. If the company is unnamed, use "untitled"."""
 
 
 def _voice_branch(voice_profile: VoiceProfile | None) -> str:

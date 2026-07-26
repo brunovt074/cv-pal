@@ -34,8 +34,9 @@ def test_prompt_never_allows_fabrication():
     assert "Never invent" in prompt
 
 
-def test_prompt_tells_host_to_save_files_under_the_bruno_vargas_naming_convention():
+def test_prompt_tells_host_to_use_render_document_for_naming():
     prompt = cv_pal_prompt("material", "posting", "en", voice_profile=None)
-    assert "bruno-vargas-cv-" in prompt
-    assert "bruno-vargas-cl-" in prompt
     assert "render_document" in prompt
+    assert 'kind="cv"' in prompt
+    assert 'kind="cover_letter"' in prompt
+    assert "naming convention" in prompt

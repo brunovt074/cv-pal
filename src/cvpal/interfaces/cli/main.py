@@ -142,7 +142,7 @@ def tailor(
     company: str = typer.Option(
         "",
         "--company",
-        help="Company name for the output filename (e.g. 'Proxify' -> 'bruno-vargas-cv-proxify.pdf'). "
+        help="Company name for the output filename (e.g. 'Proxify' -> '<your-slug>-cv-proxify.pdf'). "
         "Leave empty to use 'untitled'.",
     ),
     language: str = typer.Option(
@@ -202,7 +202,7 @@ def tailor(
 def clean(
     filename: str = typer.Argument(
         None,
-        help="Exact file name to delete from data/outputs/ (e.g. 'bruno-vargas-cv-proxify.pdf'). "
+        help="Exact file name to delete from data/outputs/ (e.g. '<your-slug>-cv-proxify.pdf'). "
         "Omit when using --all.",
     ),
     all: bool = typer.Option(

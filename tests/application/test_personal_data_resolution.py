@@ -3,16 +3,16 @@ from cvpal.domain.knowledge.models import PersonalDataField
 
 
 def test_preferred_phone_tagged_current():
-    fields = [PersonalDataField(field="phone", value="+5493772566242")]
+    fields = [PersonalDataField(field="phone", value="+1-555-0100")]
     resolved = apply_known_corrections(fields)
-    assert resolved[0].value == "+5493772566242 (current)"
+    assert resolved[0].value == "+1-555-0100 (current)"
 
 
 def test_older_phone_variants_tagged_previous():
     fields = [
-        PersonalDataField(field="phone", value="+5492604101707"),
-        PersonalDataField(field="phone", value="+542604101707"),
-        PersonalDataField(field="phone", value="+543772566242"),
+        PersonalDataField(field="phone", value="+1-555-0199"),
+        PersonalDataField(field="phone", value="+1-555-0200"),
+        PersonalDataField(field="phone", value="+1-555-0300"),
     ]
     resolved = apply_known_corrections(fields)
     assert all(v.value.endswith("(previous)") for v in resolved)
@@ -20,11 +20,9 @@ def test_older_phone_variants_tagged_previous():
 
 def test_preferred_linkedin_tagged_current_and_others_previous():
     fields = [
-        PersonalDataField(field="linkedin", value="https://www.linkedin.com/in/bruno-vargas-tettamanti-dev/"),
-        PersonalDataField(
-            field="linkedin", value="https://www.linkedin.com/in/bruno-vargas-tettamanti-developer/"
-        ),
-        PersonalDataField(field="linkedin", value="https://www.linkedin.com/in/brunodev-pdl/"),
+        PersonalDataField(field="linkedin", value="https://www.linkedin.com/in/alex-doe-dev/"),
+        PersonalDataField(field="linkedin", value="https://www.linkedin.com/in/alex-doe-developer/"),
+        PersonalDataField(field="linkedin", value="https://www.linkedin.com/in/alexdoe-old/"),
     ]
     resolved = apply_known_corrections(fields)
     assert resolved[0].value.endswith("(current)")
@@ -34,8 +32,8 @@ def test_preferred_linkedin_tagged_current_and_others_previous():
 
 def test_preferred_github_tagged_current():
     fields = [
-        PersonalDataField(field="github", value="brunovt074"),
-        PersonalDataField(field="github", value="brunovargas-pdl"),
+        PersonalDataField(field="github", value="alexdoe"),
+        PersonalDataField(field="github", value="alex-doe-old"),
     ]
     resolved = apply_known_corrections(fields)
     assert resolved[0].value.endswith("(current)")
@@ -43,6 +41,6 @@ def test_preferred_github_tagged_current():
 
 
 def test_fields_without_a_known_preference_pass_through_unchanged():
-    fields = [PersonalDataField(field="email", value="brunodev.pdl@gmail.com")]
+    fields = [PersonalDataField(field="email", value="alex.doe@example.com")]
     resolved = apply_known_corrections(fields)
-    assert resolved[0].value == "brunodev.pdl@gmail.com"
+    assert resolved[0].value == "alex.doe@example.com"

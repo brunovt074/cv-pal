@@ -7,8 +7,8 @@ Claude Code) over MCP the same way they consume engram, not a pipeline a human r
 Consolidates ~50 scattered CV/cover-letter documents (PDF/DOCX/ODT, multiple stacks: Java, PHP,
 C#, JS, Python) into a single English-language knowledge base, then any host agent tailors a CV
 and cover letter to a job posting from it - conversationally, in the author's voice, using only
-real material. Bruno is the test fixture; the design deliberately treats the user as a parameter,
-not a hardcoded assumption, for future multi-user use.
+real material. The project maintainer's own CVs are the test fixture; the design deliberately
+treats the user as a parameter, not a hardcoded assumption, for future multi-user use.
 
 ---
 
@@ -116,7 +116,7 @@ master
   `rebuilt_sections`/`skipped_sections`.
 - `application/use_cases/ingest_documents.py`: skips re-parsing a file whose mtime/size match the
   previous ingest.
-- **Measured on the real corpus** (`/home/br1/cv/`, 48 files): first `kb build` after this change
+- **Measured on the real corpus** (48 files under `CV_RAW_DIR`): first `kb build` after this change
   rebuilt all 8 sections (old checkpoints were pre-fingerprint format, correctly treated as a
   miss) in the usual several minutes. Second consecutive `kb build` with no corpus changes: **0
   agent calls, 0.26s** (down from ~3 min/section). Second `ingest` with no changes: 48/48 files
@@ -154,12 +154,12 @@ master
 - `application/use_cases/build_knowledge_base.py`: one agent call per canonical section, each
   returning JSON validated against a `domain/knowledge/models.py` model.
 - `application/services/personal_data_resolution.py`: deterministic correction pass — which
-  phone/LinkedIn/GitHub value is current is a hardcoded fact (confirmed by Bruno), never an agent
-  guess. A real substring-matching bug was caught and fixed here during implementation.
+  phone/LinkedIn/GitHub value is current is a hardcoded fact only the author can supply, never an
+  agent guess. A real substring-matching bug was caught and fixed here during implementation.
 - `infrastructure/persistence/markdown_knowledge_repository.py`: `render_markdown`/`parse_markdown`
   are now pure module functions (no I/O), reused by the repository and by
   `application/use_cases/update_knowledge_base.py` for host-initiated edits.
-- **Current real-corpus numbers** (`/home/br1/cv/`, 48 files): 36 personal data fields, 7 summary
+- **Current real-corpus numbers** (48 files under `CV_RAW_DIR`): 36 personal data fields, 7 summary
   variants, 50 experience bullets, 2 education entries, 2 certifications, 120 skills, 3 projects,
   3 languages, voice profile present. One known pre-existing extraction artifact (a UTN
   certificate URL, corrupted by two concatenated links in the source PDF) remains deferred.

@@ -10,9 +10,9 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 @pytest.mark.parametrize(
     "filename,expected_kind",
     [
-        ("cover-letter-Bruno.pdf", "cover_letter"),
+        ("cover-letter-Alex.pdf", "cover_letter"),
         ("carta-presentacion.docx", "cover_letter"),
-        ("CV-Bruno-Vargas-Tettamanti.pdf", "cv"),
+        ("CV-Alex-Doe.pdf", "cv"),
         ("random-notes.odt", "cv"),
     ],
 )
