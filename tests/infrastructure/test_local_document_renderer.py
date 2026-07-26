@@ -1,5 +1,7 @@
 import shutil
+from pathlib import Path
 
+import pypdf
 import pytest
 from docx import Document
 from docx.oxml.ns import qn
@@ -8,6 +10,7 @@ from cvpal.domain.errors import DocumentRenderError
 from cvpal.domain.generation.models import DocumentFormat
 from cvpal.infrastructure.rendering.local_document_renderer import (
     LocalDocumentRenderer,
+    extract_docx_hyperlinks,
     markdown_to_docx,
 )
 
@@ -60,6 +63,22 @@ def test_markdown_to_docx_marks_bold_runs():
     paragraph = document.paragraphs[0]
     bold_runs = [r for r in paragraph.runs if r.bold]
     assert any(r.text == "Java" for r in bold_runs)
+
+
+def test_markdown_to_docx_treats_single_asterisk_as_bold():
+    document = markdown_to_docx("Dates *(09/2023 – 02/2024, Remote)* matter.")
+    paragraph = document.paragraphs[0]
+    bold_runs = [r for r in paragraph.runs if r.bold]
+    assert any("(09/2023 – 02/2024, Remote)" in r.text for r in bold_runs)
+
+
+def test_markdown_to_docx_does_not_match_bold_across_asterisk_pairs():
+    document = markdown_to_docx("*alpha* and *beta* are separate.")
+    paragraph = document.paragraphs[0]
+    bold_runs = [r for r in paragraph.runs if r.bold]
+    bold_texts = [r.text for r in bold_runs]
+    assert "alpha" in bold_texts
+    assert "beta" in bold_texts
 
 
 def test_markdown_to_docx_uses_arial_as_default_font():
@@ -116,6 +135,52 @@ def test_render_pdf_format_produces_a_real_pdf(tmp_path):
     assert output.exists()
     assert output.stat().st_size > 0
     assert output.read_bytes()[:4] == b"%PDF"
+
+
+def test_extract_docx_hyperlinks_returns_text_url_pairs():
+    markdown = (
+        "Reach me on [LinkedIn](https://www.linkedin.com/in/bruno-vargas-tettamanti-dev) "
+        "or check [GitHub](https://github.com/brunovt074)."
+    )
+    document = markdown_to_docx(markdown)
+    docx_path = Path("/tmp/_extract_docx_hyperlinks.docx")
+    document.save(docx_path)
+
+    pairs = extract_docx_hyperlinks(docx_path)
+    assert ("LinkedIn", "https://www.linkedin.com/in/bruno-vargas-tettamanti-dev") in pairs
+    assert ("GitHub", "https://github.com/brunovt074") in pairs
+
+
+def test_extract_docx_hyperlinks_ignores_plain_paragraphs():
+    document = markdown_to_docx("Just a plain paragraph with no links.")
+    docx_path = Path("/tmp/_extract_docx_hyperlinks_plain.docx")
+    document.save(docx_path)
+
+    assert extract_docx_hyperlinks(docx_path) == []
+
+
+@pytest.mark.skipif(not _SOFFICE_AVAILABLE, reason="soffice not installed")
+def test_render_pdf_preserves_hyperlinks_as_clickable_annotations(tmp_path):
+    renderer = LocalDocumentRenderer()
+    output = tmp_path / "cv.pdf"
+    markdown = (
+        "Contact: [LinkedIn](https://www.linkedin.com/in/bruno-vargas-tettamanti-dev) "
+        "and [GitHub](https://github.com/brunovt074).\n"
+    )
+    renderer.render(markdown, document_format=DocumentFormat.PDF, output_path=output)
+
+    reader = pypdf.PdfReader(str(output))
+    page = reader.pages[0]
+    link_uris = sorted(
+        annot.get_object()["/A"]["/URI"]
+        for annot in page["/Annots"]
+        if annot.get_object().get("/Subtype") == "/Link"
+        and annot.get_object().get("/A", {}).get("/S") == "/URI"
+    )
+    assert link_uris == [
+        "https://github.com/brunovt074",
+        "https://www.linkedin.com/in/bruno-vargas-tettamanti-dev",
+    ]
 
 
 def test_render_unsupported_format_raises(tmp_path):

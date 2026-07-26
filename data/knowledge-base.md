@@ -200,6 +200,7 @@
 | JWT | tool | Ssr |  | JSON Web Token for authentication | Java/CV-Bruno-Vargas-.odt, Java/CV-Bruno-Vargas-Tettamanti-fullstack.odt, cv/CV-Bruno-Vargas-Tettamanti-without-contact.odt |
 | JBoss/WildFly | tool | Ssr |  | Java application server | cv-latests/CV-Bruno-Vargas-Tettamanti-1.pdf, cv-latests/CV-Bruno-Vargas-Tettamanti-Java.docx |
 | IntelliJ IDEA | tool | Ssr |  | Java IDE | cv-latests/CV-Bruno-Vargas-Tettamanti-1.pdf, cv-latests/CV-Bruno-Vargas-Tettamanti-Java.docx |
+| n8n | tool | Ssr |  | workflow automation / low-code integration | |
 | REST | practice | Ssr |  | REST APIs, RESTful API design | Java/CV-Bruno-Vargas-.odt, Java/CV-Bruno-Vargas-Tettamanti-fullstack.odt, cv/CV-Bruno-Vargas-Tettamanti-without-contact.odt |
 | SOA | practice | Ssr |  | Service-Oriented Architecture | Java/CV-Bruno-Vargas-.odt, PHP/CV-Bruno-Vargas-Tettamanti-PHP.docx, cv-latests/CV-Bruno-Vargas-Tettamanti-1.pdf |
 | MVC | practice | Ssr |  | Model-View-Controller pattern | Java/CV-Bruno-Vargas-.odt, Java/CV-Bruno-Vargas-Tettamanti-fullstack.odt, cv/CV-Bruno-Vargas-Tettamanti-without-contact.odt |
@@ -256,8 +257,6 @@
 | Cursor | ai | Ssr |  | AI coding editor | cv/CV-Bruno-Vargas-Tettamanti-.pdf, cv/CV-Bruno-Vargas-Tettamanti-near.odt |
 | Windsurf | ai | Ssr |  | AI coding tool | cv/CV-Bruno-Vargas-Tettamanti-.pdf, cv/CV-Bruno-Vargas-Tettamanti-near.odt |
 | Agents/skills | ai | Ssr |  | AI agent and harness patterns | cv/CV-Bruno-Vargas-Tettamanti-.pdf, cv/CV-Bruno-Vargas-Tettamanti-near.odt |
-| AWS | cloud | Jr |  | cloud platform | Java/CV-Bruno-Vargas-Tettamanti-ES.pdf |
-| Digital Ocean | cloud | Jr |  | cloud hosting | Java/CV-Bruno-Vargas-Tettamanti-ES.pdf |
 | WebSockets | other | Ssr |  | real-time communication protocol | Java/CV-Bruno-Vargas-.odt, Java/CV-Bruno-Vargas-Tettamanti-fullstack.odt, cv/CV-Bruno-Vargas-Tettamanti-without-contact.odt |
 | File storage | other | Ssr |  | file storage systems | Java/CV-Bruno-Vargas-.odt, Java/CV-Bruno-Vargas-Tettamanti-fullstack.odt, cv/CV-Bruno-Vargas-Tettamanti-without-contact.odt |
 | Command creation | other | Ssr |  | CLI command development | Java/CV-Bruno-Vargas-.odt, Java/CV-Bruno-Vargas-Tettamanti-fullstack.odt, cv/CV-Bruno-Vargas-Tettamanti-without-contact.odt |
@@ -298,6 +297,17 @@
 | avoided_patterns | Never exaggerates or oversells. Avoids buzzwords: 'passionate', 'rockstar', 'ninja', 'visionary', 'guru', 'obsessed'. Never claims to be 'the best' or 'perfect fit'. No complaints about past employers or colleagues. No unsupported superlatives about own work. Never starts with 'To whom it may concern'. Never ends with 'Sincerely' or 'Yours faithfully'. No exclamation marks. No em-dash overuse. Never fabricates experience — explicitly qualifies gaps ('Blockchain isn't new for me as an interest, but it's new as practical experience'; 'aprendí C# ... aunque no tuve la oportunidad de usarlo profesionalmente más allá del ámbito académico'). |
 | language_specific_traits | B2-level English: correct grammar but formulaic constructions ('I am writing to apply for...'), limited transition word inventory (favors 'also', 'besides' over 'furthermore'/'moreover'), simpler sentence structures than in Spanish, slightly shorter and more templated letters. Spanish shows native fluency: varied clause structures, natural connectors ('lo que sumado a...'), confident colloquialisms ('me muevo con comodidad', 'cuando el proyecto lo pida'). Technical vocabulary is strong in both languages regardless of B2 level. English letters lean on the technical stack as credibility; Spanish letters add personal warmth and concrete work anecdotes. When writing English for this author: use correct but straightforward grammar, favor short clear sentences over complex subordination, rely on technical precision rather than rhetorical flourish, and keep cultural humility (e.g. 'I want to be honest about where I am' instead of claiming seniority). |
 | tone_summary | Humble but confident about demonstrated ability — never claims what hasn't been done, stands firm on what has; Prefers evidence over claims — cites specific stacks, products, domains, and team contexts rather than adjectives about himself; Honest about gaps — explicitly names what he hasn't done yet and frames it as a learning trajectory, not a weakness; Values craftsmanship — 'código mantenible', 'clean code, high standards', 'entender el porqué de cada decisión'; People-oriented — mentions synergy with teammates, enjoying collaboration, and the human side of engineering; Mission-aligned — connects his motivation to what the company actually builds, not just what stack they use; No pretense — 'Quick version of why I think it's a fit:', 'I want to be honest about where I am' — transparency as a deliberate stylistic choice |
+<!-- /cvpal:section -->
+
+<!-- cvpal:section=professional_direction -->
+## Professional Direction
+
+| Trait | Value |
+|---|---|
+| architecture | DDD, Clean Architecture, SOA, and event-driven patterns are the user's natural problem-solving lens — not just skills listed on a CV, but how they think about system design. In any tailored CV, architecture and design choices should be presented as deliberate, problem-driven decisions. Subtle positioning toward technical leadership and architectural thinking is encouraged; explicit "Architect" titles are not. |
+| quality_testing | TDD, automated testing, and regression prevention are deep habits, not optional extras. The user's experience debugging production fintech systems (wallets, transactions, real money) has made correctness a non-negotiable part of their engineering identity. Subtle SDET-like framing — where testing is treated as part of the craft, not a separate role — is encouraged. Do not use the term "SDET" in the output. |
+| craftsmanship | The user values code that another developer can read six months later and understand without a call. A good architecture is the one that makes the next change cheap, not the first one fast. Clean, maintainable, and scalable deliveries are the baseline. These ideas should permeate every tailored CV and cover letter — not as explicit statements, but as the lens through which experience and skills are framed. |
+| experience_ordering | When drafting a CV, order experience blocks by relevance and current impact, not strictly by date: (1) Reyesoft — the current role, most relevant fintech experience, always first; (2) Mentoring, teaching, and instructor roles — show knowledge transfer, versatility, and soft skills prominently right after the current role; (3) Freelance work and side projects; (4) Work simulations (NoCountry) and internships (Savicsoft) — these are the least important and should appear last. |
 <!-- /cvpal:section -->
 
 <!-- cvpal:notes -->

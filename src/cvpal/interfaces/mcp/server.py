@@ -24,6 +24,7 @@ from mcp.server.fastmcp import FastMCP
 from cvpal.application.prompts.cv_pal import cv_pal_prompt
 from cvpal.application.services.agent_view import render_agent_view
 from cvpal.application.services.markdown_sections import extract_section_block
+from cvpal.application.services.output_naming import build_output_filename
 from cvpal.application.use_cases.audit_knowledge_base import audit_personal_data
 from cvpal.application.use_cases.build_knowledge_base import build_knowledge_base
 from cvpal.application.use_cases.ingest_documents import ingest_documents
@@ -224,14 +225,32 @@ def rebuild_knowledge_base() -> str:
     return _rebuild_knowledge_base(_container())
 
 
-def _render_document(container: Container, markdown: str, document_format: str, filename: str) -> str:
+def _render_document(
+    container: Container,
+    markdown: str,
+    document_format: str,
+    filename: str,
+    kind: str = "",
+    company: str = "",
+) -> str:
     try:
         fmt = DocumentFormat(document_format)
     except ValueError:
         valid = ", ".join(f.value for f in DocumentFormat)
         return f"Unknown format '{document_format}'. Use one of: {valid}."
 
-    output_path = container.settings.outputs_dir / filename
+    extension = {"markdown": "md", "docx": "docx", "pdf": "pdf"}[fmt.value]
+    if kind:
+        try:
+            output_name = build_output_filename(
+                kind=kind, company=company, extension=extension
+            )
+        except ValueError as exc:
+            return f"Unknown kind '{kind}'. {exc}"
+    else:
+        output_name = filename
+
+    output_path = container.settings.outputs_dir / output_name
     try:
         result_path = container.document_renderer.render(
             markdown, document_format=fmt, output_path=output_path
@@ -242,10 +261,26 @@ def _render_document(container: Container, markdown: str, document_format: str, 
 
 
 @mcp.tool()
-def render_document(markdown: str, document_format: str, filename: str) -> str:
+def render_document(
+    markdown: str,
+    document_format: str,
+    filename: str = "",
+    kind: str = "",
+    company: str = "",
+) -> str:
     """Convert markdown (a CV or cover letter you just wrote) into a real
     file under data/outputs/. document_format is one of: markdown, docx,
-    pdf. filename is just the file name, e.g. "cv-acme-backend.pdf" - no
-    agent or API key needed, this runs locally.
+    pdf.
+
+    Two ways to name the file:
+    - Pass kind="cv" (or "cover_letter") and company="<name>" and the
+      tool will build the conventional file name for you
+      (bruno-vargas-cv-<slug>.{ext} for CVs,
+      bruno-vargas-cl-<slug>.{ext} for cover letters). This is the
+      recommended path - it keeps every output named the same way.
+    - Or pass an explicit filename. Used only when you need to override
+      the convention (e.g. debug dumps).
+
+    No agent or API key needed - this runs locally.
     """
-    return _render_document(_container(), markdown, document_format, filename)
+    return _render_document(_container(), markdown, document_format, filename, kind, company)

@@ -6,8 +6,10 @@ from pathlib import Path
 import typer
 from dotenv import load_dotenv
 
+from cvpal.application.services.output_naming import build_output_filename
 from cvpal.application.use_cases.audit_knowledge_base import audit_personal_data
 from cvpal.application.use_cases.build_knowledge_base import build_knowledge_base
+from cvpal.application.use_cases.clean_outputs import clean_outputs
 from cvpal.application.use_cases.ingest_documents import ingest_documents
 from cvpal.application.use_cases.tailor_cv import tailor_cv
 from cvpal.config import get_settings
@@ -137,6 +139,12 @@ def tailor(
     job_url: str = typer.Option(
         None, "--job-url", help="Job posting URL - fetched and stripped to readable text"
     ),
+    company: str = typer.Option(
+        "",
+        "--company",
+        help="Company name for the output filename (e.g. 'Proxify' -> 'bruno-vargas-cv-proxify.pdf'). "
+        "Leave empty to use 'untitled'.",
+    ),
     language: str = typer.Option(
         None, "--language", help="Output language (e.g. 'en', 'es'); defaults to English"
     ),
@@ -171,10 +179,13 @@ def tailor(
     source = container.job_posting_source(text=job_text, file=job_file, url=job_url)
     knowledge_base_markdown = settings.knowledge_base_md.read_text()
 
-    tailored = tailor_cv(source, knowledge_base_markdown, agent, language_override=language)
+    tailored = tailor_cv(
+        source, knowledge_base_markdown, agent, language_override=language, company=company
+    )
 
     extension = {"markdown": "md", "docx": "docx", "pdf": "pdf"}[fmt.value]
-    output_path = output or (settings.outputs_dir / f"cv-tailored-{tailored.language}.{extension}")
+    default_name = build_output_filename(kind="cv", company=tailored.company, extension=extension)
+    output_path = output or (settings.outputs_dir / default_name)
 
     try:
         result_path = container.document_renderer.render(
@@ -185,6 +196,36 @@ def tailor(
         raise typer.Exit(1) from None
 
     typer.echo(f"Wrote tailored CV ({tailored.language}, {fmt.value}) -> {result_path}")
+
+
+@app.command()
+def clean(
+    filename: str = typer.Argument(
+        None,
+        help="Exact file name to delete from data/outputs/ (e.g. 'bruno-vargas-cv-proxify.pdf'). "
+        "Omit when using --all.",
+    ),
+    all: bool = typer.Option(
+        False, "--all", "-a", help="Delete every file in data/outputs/."
+    ),
+) -> None:
+    """Delete tailored CV/cover-letter outputs.
+
+    Pass an exact file name to remove a single document, or --all/-a to
+    clear the entire outputs directory. Refuses to do anything if neither
+    argument is supplied, to avoid accidental wipes.
+    """
+    settings = get_settings()
+    settings.outputs_dir.mkdir(parents=True, exist_ok=True)
+    result = clean_outputs(
+        outputs_dir=settings.outputs_dir, filename=filename, remove_all=all
+    )
+    if not result.deleted:
+        typer.echo(result.reason or "Nothing to delete.")
+        raise typer.Exit(1)
+    typer.echo(f"Deleted {len(result.deleted)} file(s):")
+    for path in result.deleted:
+        typer.echo(f"  - {path.name}")
 
 
 @agents_app.command("list")

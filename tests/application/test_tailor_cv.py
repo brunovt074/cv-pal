@@ -54,3 +54,63 @@ def test_tailor_cv_sends_job_posting_and_knowledge_base_in_prompt():
     sent_prompt = agent.requests[0].prompt
     assert "UNIQUE_JOB_MARKER" in sent_prompt
     assert "UNIQUE_KB_MARKER" in sent_prompt
+
+
+def test_tailor_cv_records_company_name_when_provided():
+    posting = JobPosting(source="text", raw_text="Backend developer role")
+    agent = FakeTextAgent(["content"])
+
+    doc = tailor_cv(
+        _FakeJobPostingSource(posting),
+        "kb",
+        agent,
+        company="Proxify",
+    )
+
+    assert doc.company == "Proxify"
+
+
+def test_tailor_cv_company_defaults_to_empty_string():
+    posting = JobPosting(source="text", raw_text="Backend developer role")
+    agent = FakeTextAgent(["content"])
+
+    doc = tailor_cv(
+        _FakeJobPostingSource(posting),
+        "kb",
+        agent,
+    )
+
+    assert doc.company == ""
+
+
+def test_tailor_cv_prompt_directs_agent_to_use_double_asterisk_for_bold():
+    posting = JobPosting(source="text", raw_text="any posting")
+    agent = FakeTextAgent(["content"])
+
+    tailor_cv(_FakeJobPostingSource(posting), "kb", agent)
+
+    sent_prompt = agent.requests[0].prompt
+    assert "**" in sent_prompt
+    assert "double asterisks" in sent_prompt.lower() or "**bold**" in sent_prompt
+
+
+def test_tailor_cv_prompt_reminds_to_include_teaching_mentoring_experience():
+    posting = JobPosting(source="text", raw_text="any posting")
+    agent = FakeTextAgent(["content"])
+
+    tailor_cv(_FakeJobPostingSource(posting), "kb", agent)
+
+    sent_prompt = agent.requests[0].prompt
+    assert "teaching" in sent_prompt.lower() or "mentor" in sent_prompt.lower()
+
+
+def test_tailor_cv_prompt_tells_agent_to_bold_only_label_in_skills():
+    posting = JobPosting(source="text", raw_text="any posting")
+    agent = FakeTextAgent(["content"])
+
+    tailor_cv(_FakeJobPostingSource(posting), "kb", agent)
+
+    sent_prompt = agent.requests[0].prompt
+    lowered = sent_prompt.lower()
+    assert "label" in lowered or "category" in lowered
+    assert "skills" in lowered

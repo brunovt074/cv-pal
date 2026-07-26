@@ -20,6 +20,7 @@ def tailor_cv(
     agent: TextCompletionPort,
     *,
     language_override: str | None = None,
+    company: str = "",
 ) -> TailoredDocument:
     posting = job_posting_source.read()
     language = language_override or _DEFAULT_LANGUAGE
@@ -29,6 +30,7 @@ def tailor_cv(
 
     return TailoredDocument(
         kind="cv",
+        company=company,
         language=language,
         document_format=DocumentFormat.MARKDOWN,
         content=result.text.strip(),

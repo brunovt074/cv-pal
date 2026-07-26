@@ -32,3 +32,10 @@ def test_prompt_with_voice_profile_confirms_captured_essence():
 def test_prompt_never_allows_fabrication():
     prompt = cv_pal_prompt("material", "posting", "en", voice_profile=None)
     assert "Never invent" in prompt
+
+
+def test_prompt_tells_host_to_save_files_under_the_bruno_vargas_naming_convention():
+    prompt = cv_pal_prompt("material", "posting", "en", voice_profile=None)
+    assert "bruno-vargas-cv-" in prompt
+    assert "bruno-vargas-cl-" in prompt
+    assert "render_document" in prompt

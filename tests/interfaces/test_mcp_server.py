@@ -286,3 +286,60 @@ def test_rebuild_knowledge_base_is_a_no_op_when_nothing_changed(tmp_path):
     result = server._rebuild_knowledge_base(container)
 
     assert "already up to date" in result.lower()
+
+
+# --- render_document ---
+
+
+def test_render_document_uses_explicit_filename_when_no_kind_provided(tmp_path):
+    container = _container(tmp_path)
+    result = server._render_document(
+        container,
+        markdown="# Title\n\nBody",
+        document_format="markdown",
+        filename="custom-name.md",
+        kind="",
+        company="",
+    )
+    assert "custom-name.md" in result
+    assert (container.settings.outputs_dir / "custom-name.md").exists()
+
+
+def test_render_document_builds_cv_filename_from_kind_and_company(tmp_path):
+    container = _container(tmp_path)
+    result = server._render_document(
+        container,
+        markdown="# Title\n\nBody",
+        document_format="docx",
+        filename="ignored.md",
+        kind="cv",
+        company="Proxify",
+    )
+    assert "bruno-vargas-cv-proxify.docx" in result
+    assert (container.settings.outputs_dir / "bruno-vargas-cv-proxify.docx").exists()
+
+
+def test_render_document_builds_cover_letter_filename_from_kind_and_company(tmp_path):
+    container = _container(tmp_path)
+    result = server._render_document(
+        container,
+        markdown="# Title\n\nBody",
+        document_format="pdf",
+        filename="ignored.md",
+        kind="cover_letter",
+        company="Acme Corp",
+    )
+    assert "bruno-vargas-cl-acme-corp.pdf" in result
+
+
+def test_render_document_rejects_unknown_kind(tmp_path):
+    container = _container(tmp_path)
+    result = server._render_document(
+        container,
+        markdown="x",
+        document_format="docx",
+        filename="x.docx",
+        kind="resume",
+        company="X",
+    )
+    assert "Unknown kind" in result

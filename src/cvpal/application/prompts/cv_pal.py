@@ -15,11 +15,21 @@ _RULES = """\
 Rules:
 - Use ONLY material present in the knowledge base below. Never invent a \
 skill, role, company, date, certification, or project absent from it. If \
-the posting calls for something not present, honestly omit it or frame \
-the closest real, adjacent experience - never fabricate.
+the posting calls for something not present, honestly omit it or frame the \
+closest real, adjacent experience - never fabricate.
 - Select only the subset of experience bullets, skills, and projects that \
 are actually relevant to this posting - do not dump the entire history.
 - Write in {language}."""
+
+
+_NAMING_CONVENTION = """\
+Output file naming (when the user asks to save a real file):
+- CV: bruno-vargas-cv-<company-slug>.<ext>     (e.g. bruno-vargas-cv-proxify.pdf)
+- Cover letter: bruno-vargas-cl-<company-slug>.<ext>
+Company slug = company name lowercased, whitespace/punctuation -> '-', \
+accents stripped. Use the render_document tool with kind="cv" or \
+kind="cover_letter" plus company="<name>" and it will construct the \
+correct file name for you. If the company is unnamed, use "untitled"."""
 
 
 def _voice_branch(voice_profile: VoiceProfile | None) -> str:
@@ -60,6 +70,8 @@ You are helping tailor a CV - and, if wanted, a cover letter - to the job \
 posting below, using ONLY the knowledge base material provided.
 
 {_RULES.format(language=language)}
+
+{_NAMING_CONVENTION}
 
 Protocol:
 1. Write the tailored CV and PRINT THE FULL TEXT in this conversation \
