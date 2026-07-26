@@ -1,12 +1,14 @@
-import openpyxl
+import pytest
 
-from cvpal.domain.knowledge.models import (
+openpyxl = pytest.importorskip("openpyxl", reason="optional 'xlsx' extra not installed")
+
+from cvpal.domain.knowledge.models import (  # noqa: E402
     CoverLetterEntry,
     CVVersionEntry,
     ExperienceBullet,
     KnowledgeBase,
 )
-from cvpal.infrastructure.persistence.xlsx_exporter import export_workbook
+from cvpal.infrastructure.persistence.xlsx_exporter import export_workbook  # noqa: E402
 
 
 def test_export_workbook_creates_all_expected_tabs(tmp_path):

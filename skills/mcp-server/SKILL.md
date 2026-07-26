@@ -54,8 +54,9 @@ before changing which use case backs a handler.
 
 ## Client configuration
 
-Both configs point at the same thing: `cvpal serve-mcp` over stdio. Use the venv's full binary
-path (`.venv/bin/cvpal`) unless `cvpal` is on the host's PATH.
+Both configs point at the same thing: `cvpal-mcp` (equivalently, `cvpal serve-mcp`) over stdio.
+Installed from PyPI, `uvx` resolves the binary with no local checkout needed - see README.md.
+Working from a local clone instead, use the venv's full binary path (`.venv/bin/cvpal-mcp`).
 
 **opencode** (`~/.config/opencode/opencode.jsonc`, alongside engram):
 
@@ -63,7 +64,7 @@ path (`.venv/bin/cvpal`) unless `cvpal` is on the host's PATH.
 {
   "mcp": {
     "cvpal": {
-      "command": ["/path/to/cv-pal/.venv/bin/cvpal", "serve-mcp"],
+      "command": ["uvx", "--from", "cv-pal", "cvpal-mcp"],
       "enabled": true,
       "type": "local"
     }
@@ -74,7 +75,7 @@ path (`.venv/bin/cvpal`) unless `cvpal` is on the host's PATH.
 **Claude Code**:
 
 ```bash
-claude mcp add cvpal -- /path/to/cv-pal/.venv/bin/cvpal serve-mcp
+claude mcp add cvpal -- uvx --from cv-pal cvpal-mcp
 ```
 
 ## Testing

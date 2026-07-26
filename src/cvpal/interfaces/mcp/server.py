@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 from cvpal.application.prompts.cv_pal import cv_pal_prompt
@@ -290,3 +291,18 @@ def render_document(
     No agent or API key needed - this runs locally.
     """
     return _render_document(_container(), markdown, document_format, filename, kind, company)
+
+
+def main() -> None:
+    """Entry point for the `cvpal-mcp` console script (and `cvpal serve-mcp`,
+    which just imports and calls this). Loads .env itself, unlike the CLI's
+    `mcp = FastMCP(...)` module import alone - a host launching this module
+    directly (`uvx cv-pal cvpal-mcp`) never goes through interfaces/cli/main.py,
+    which is otherwise the only place .env gets loaded.
+    """
+    load_dotenv()
+    mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

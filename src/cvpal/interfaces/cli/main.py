@@ -418,10 +418,11 @@ def doctor() -> None:
 def serve_mcp() -> None:
     """Start the MCP server over stdio, for opencode/Claude Code/etc. to
     consume cv-pal as a tool, the same way they already consume engram.
+    Equivalent to the standalone `cvpal-mcp` console script.
     """
-    from cvpal.interfaces.mcp.server import mcp
+    from cvpal.interfaces.mcp.server import main as run_mcp_server
 
-    mcp.run(transport="stdio")
+    run_mcp_server()
 
 
 if __name__ == "__main__":
