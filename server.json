@@ -1,0 +1,24 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.brunovt074/cv-pal",
+  "description": "Agent-agnostic CV/cover-letter tailoring, consumed as an MCP server by any MCP-capable agent",
+  "repository": {
+    "url": "https://github.com/brunovt074/cv-pal",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "cv-pal",
+      "version": "0.1.0",
+      "runtimeHint": "uvx",
+      "runtimeArguments": [
+        { "type": "named", "name": "--from", "value": "cv-pal" },
+        { "type": "positional", "value": "cvpal-mcp", "valueHint": "script" }
+      ],
+      "transport": { "type": "stdio" }
+    }
+  ]
+}
