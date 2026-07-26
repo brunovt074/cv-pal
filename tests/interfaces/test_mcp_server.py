@@ -11,7 +11,7 @@ from tests.fakes.fake_text_agent import FakeTextAgent
 
 
 def _settings(tmp_path) -> Settings:
-    settings = Settings()
+    settings = Settings(config_path=tmp_path / "nonexistent-config.toml")
     settings.data_dir = tmp_path
     settings.ingested_json = tmp_path / "ingested.json"
     settings.knowledge_base_md = tmp_path / "knowledge-base.md"

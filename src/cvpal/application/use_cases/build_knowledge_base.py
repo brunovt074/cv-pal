@@ -79,6 +79,7 @@ def build_knowledge_base(
     agent: TextCompletionPort,
     agent_name: str,
     checkpoint_store: CheckpointStorePort,
+    preferred_values: dict[str, str],
 ) -> KnowledgeBaseBuildReport:
     cvs = [d for d in documents if d.doc_kind == "cv"]
     rebuilt: list[str] = []
@@ -96,7 +97,7 @@ def build_knowledge_base(
         raw = complete_as(
             agent, agent_name, extraction.personal_data_prompt(personal_blocks), list[PersonalDataField]
         )
-        return apply_known_corrections(raw)
+        return apply_known_corrections(raw, preferred_values)
 
     personal_data, changed = with_checkpoint_list(
         checkpoint_store, "personal_data", PersonalDataField, personal_fingerprint, _compute_personal_data

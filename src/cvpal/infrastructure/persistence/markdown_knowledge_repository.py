@@ -13,7 +13,6 @@ fit the structured shape.
 
 from __future__ import annotations
 
-import os
 import re
 import typing
 from datetime import datetime, timezone
@@ -34,12 +33,10 @@ from cvpal.domain.knowledge.models import (
     SummaryEntry,
 )
 from cvpal.domain.knowledge.voice import VoiceProfile
+from cvpal.domain.user.profile import DEFAULT_NAME
 
-_DEFAULT_USER_NAME = "Alex Doe"
 
-
-def _header() -> str:
-    name = os.environ.get("CVPAL_USER_NAME", _DEFAULT_USER_NAME)
+def _header(name: str) -> str:
     return f"""\
 # {name} — Knowledge Base
 
@@ -170,11 +167,11 @@ def _parse_voice_profile(block: str) -> VoiceProfile | None:
     return VoiceProfile.model_validate(data) if data else None
 
 
-def render_markdown(knowledge_base: KnowledgeBase) -> str:
+def render_markdown(knowledge_base: KnowledgeBase, *, header_name: str = DEFAULT_NAME) -> str:
     """Pure rendering, no I/O - reused by the repository's `save()` and by
     callers (e.g. the MCP server) that need the text without touching disk.
     """
-    parts = [_header()]
+    parts = [_header(header_name)]
     for key, heading, model_type in _SECTIONS:
         rows = getattr(knowledge_base, key)
         parts.append(_render_section(key, heading, rows, model_type))
@@ -206,15 +203,16 @@ def parse_markdown(text: str) -> KnowledgeBase:
 
 
 class MarkdownKnowledgeRepository:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, header_name: str = DEFAULT_NAME) -> None:
         self._path = path
+        self._header_name = header_name
 
     def exists(self) -> bool:
         return self._path.exists()
 
     def save(self, knowledge_base: KnowledgeBase) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(render_markdown(knowledge_base))
+        self._path.write_text(render_markdown(knowledge_base, header_name=self._header_name))
 
     def load(self) -> KnowledgeBase:
         return parse_markdown(self._path.read_text())

@@ -29,6 +29,12 @@ _DOCS = [
     ),
 ]
 
+_PREFERRED_VALUES = {
+    "phone": "+1-555-0100",
+    "linkedin": "https://www.linkedin.com/in/alex-doe-dev/",
+    "github": "alexdoe",
+}
+
 _ALL_SECTIONS = [
     "personal_data",
     "summaries",
@@ -89,7 +95,7 @@ def test_build_knowledge_base_assembles_all_sections(tmp_path):
     agent = FakeTextAgent(list(_RESPONSES))
     store = FileCheckpointStore(tmp_path)
 
-    report = build_knowledge_base(_DOCS, agent, "fake-agent", store)
+    report = build_knowledge_base(_DOCS, agent, "fake-agent", store, _PREFERRED_VALUES)
     kb = report.knowledge_base
 
     assert kb.personal_data[0].field == "name"
@@ -109,10 +115,10 @@ def test_build_knowledge_base_assembles_all_sections(tmp_path):
 def test_build_knowledge_base_resumes_from_checkpoints_without_recalling_agent(tmp_path):
     agent = FakeTextAgent(list(_RESPONSES))
     store = FileCheckpointStore(tmp_path)
-    build_knowledge_base(_DOCS, agent, "fake-agent", store)
+    build_knowledge_base(_DOCS, agent, "fake-agent", store, _PREFERRED_VALUES)
 
     agent_second_run = FakeTextAgent([])  # would raise if called
-    report = build_knowledge_base(_DOCS, agent_second_run, "fake-agent", store)
+    report = build_knowledge_base(_DOCS, agent_second_run, "fake-agent", store, _PREFERRED_VALUES)
 
     assert report.knowledge_base.personal_data[0].field == "name"
     assert agent_second_run.requests == []
@@ -123,7 +129,7 @@ def test_build_knowledge_base_resumes_from_checkpoints_without_recalling_agent(t
 def test_build_knowledge_base_rebuilds_only_the_section_whose_input_changed(tmp_path):
     agent = FakeTextAgent(list(_RESPONSES))
     store = FileCheckpointStore(tmp_path)
-    build_knowledge_base(_DOCS, agent, "fake-agent", store)
+    build_knowledge_base(_DOCS, agent, "fake-agent", store, _PREFERRED_VALUES)
 
     changed_docs = [
         _DOCS[0].model_copy(
@@ -135,7 +141,7 @@ def test_build_knowledge_base_rebuilds_only_the_section_whose_input_changed(tmp_
         [json.dumps([{"skill": "Kotlin", "category": "language", "source_files": ["a.pdf"]}])]
     )
 
-    report = build_knowledge_base(changed_docs, agent_second_run, "fake-agent", store)
+    report = build_knowledge_base(changed_docs, agent_second_run, "fake-agent", store, _PREFERRED_VALUES)
 
     assert report.rebuilt_sections == ["skills"]
     assert set(report.skipped_sections) == set(_ALL_SECTIONS) - {"skills"}

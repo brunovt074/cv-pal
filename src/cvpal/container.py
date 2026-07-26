@@ -69,7 +69,9 @@ class Container:
 
     @property
     def knowledge_repository(self) -> MarkdownKnowledgeRepository:
-        return MarkdownKnowledgeRepository(self.settings.knowledge_base_md)
+        return MarkdownKnowledgeRepository(
+            self.settings.knowledge_base_md, header_name=self.settings.user.name
+        )
 
     @property
     def checkpoint_store(self) -> FileCheckpointStore:

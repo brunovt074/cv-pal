@@ -6,38 +6,16 @@ agent must never guess it. This applies the known-authoritative values as
 a post-processing pass, tagging every extracted value as current or
 previous rather than silently dropping the others (traceability).
 
-The preferred values are per-user and never hardcoded: they read from
-CVPAL_PHONE / CVPAL_LINKEDIN / CVPAL_GITHUB at call time (not import
-time - .env is loaded by the CLI entry point after this module is first
-imported), falling back to a placeholder identity if unset.
+The preferred values are per-user (`domain.user.profile.UserProfile`,
+built from `config.Settings` and threaded through by the caller) - never
+hardcoded here.
 """
 
 from __future__ import annotations
 
-import os
 import re
 
 from cvpal.domain.knowledge.models import PersonalDataField
-
-_DEFAULT_PREFERRED_VALUES: dict[str, str] = {
-    "phone": "+1-555-0100",
-    "linkedin": "https://www.linkedin.com/in/alex-doe-dev/",
-    "github": "alexdoe",
-}
-
-_ENV_OVERRIDES: dict[str, str] = {
-    "phone": "CVPAL_PHONE",
-    "linkedin": "CVPAL_LINKEDIN",
-    "github": "CVPAL_GITHUB",
-}
-
-
-def _preferred_values() -> dict[str, str]:
-    return {
-        field: os.environ.get(env_var, _DEFAULT_PREFERRED_VALUES[field])
-        for field, env_var in _ENV_OVERRIDES.items()
-    }
-
 
 _URL_PREFIX = re.compile(r"^https?://(www\.)?(linkedin\.com/in/|github\.com/)?")
 
@@ -62,8 +40,9 @@ def _matches_preferred(field: str, value: str, preferred: str) -> bool:
     return _normalize_identifier(value) == _normalize_identifier(preferred)
 
 
-def apply_known_corrections(fields: list[PersonalDataField]) -> list[PersonalDataField]:
-    preferred_values = _preferred_values()
+def apply_known_corrections(
+    fields: list[PersonalDataField], preferred_values: dict[str, str]
+) -> list[PersonalDataField]:
     resolved: list[PersonalDataField] = []
     for entry in fields:
         field_key = entry.field.strip().lower()

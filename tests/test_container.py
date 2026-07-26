@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from cvpal.config import Settings
@@ -11,7 +13,7 @@ from cvpal.infrastructure.web_content.http_web_content import HttpWebContent
 
 
 def _settings(agent_name: str) -> Settings:
-    settings = Settings()
+    settings = Settings(config_path=Path("/nonexistent/cvpal-test-config.toml"))
     settings.agent_name = agent_name
     return settings
 

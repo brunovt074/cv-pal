@@ -4,9 +4,9 @@ Convention:
     {user-slug}-cv-{company-lowercase-slug}.{ext}      for CVs
     {user-slug}-cl-{company-lowercase-slug}.{ext}      for cover letters
 
-`{user-slug}` identifies the author and is per-user - never hardcoded. It
-reads from CVPAL_USER_SLUG at call time, falling back to a placeholder
-identity if unset (see PROJECT_STATUS for the naming convention's why).
+`{user-slug}` identifies the author and is per-user - never hardcoded,
+always passed in by the caller (`domain.user.profile.UserProfile.slug`,
+see PROJECT_STATUS for the naming convention's why).
 
 The company name is normalized to a filesystem-safe slug: lowercased,
 whitespace and `.`/`,` collapsed to `-`, accents stripped, anything that
@@ -17,12 +17,10 @@ user to supply a real company name next time).
 
 from __future__ import annotations
 
-import os
 import re
 import unicodedata
 
 _KIND_PREFIX = {"cv": "cv", "cover_letter": "cl"}
-_DEFAULT_USER_SLUG = "alex-doe"
 _FALLBACK_COMPANY = "untitled"
 
 _NON_SLUG_CHARS = re.compile(r"[^a-z0-9-]+")
@@ -55,10 +53,9 @@ def _slugify_company(company: str) -> str:
     return collapsed or _FALLBACK_COMPANY
 
 
-def build_output_filename(*, kind: str, company: str, extension: str) -> str:
+def build_output_filename(*, kind: str, company: str, extension: str, user_slug: str) -> str:
     if kind not in _KIND_PREFIX:
         raise ValueError(f"Unknown document kind: {kind!r}. Use 'cv' or 'cover_letter'.")
     prefix = _KIND_PREFIX[kind]
     slug = _slugify_company(company)
-    user_slug = os.environ.get("CVPAL_USER_SLUG", _DEFAULT_USER_SLUG)
     return f"{user_slug}-{prefix}-{slug}.{extension}"

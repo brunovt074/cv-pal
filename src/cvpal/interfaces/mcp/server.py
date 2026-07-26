@@ -207,7 +207,13 @@ def _rebuild_knowledge_base(container: Container) -> str:
         return f"Configured agent can't do this: {exc}"
 
     documents = container.raw_document_repository.load()
-    report = build_knowledge_base(documents, agent, container.settings.agent_name, container.checkpoint_store)
+    report = build_knowledge_base(
+        documents,
+        agent,
+        container.settings.agent_name,
+        container.checkpoint_store,
+        container.settings.user.preferred_values,
+    )
     container.knowledge_repository.save(report.knowledge_base)
 
     if not report.rebuilt_sections:
@@ -243,7 +249,7 @@ def _render_document(
     if kind:
         try:
             output_name = build_output_filename(
-                kind=kind, company=company, extension=extension
+                kind=kind, company=company, extension=extension, user_slug=container.settings.user.slug
             )
         except ValueError as exc:
             return f"Unknown kind '{kind}'. {exc}"
