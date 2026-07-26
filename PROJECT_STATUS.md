@@ -22,10 +22,8 @@ treats the user as a parameter, not a hardcoded assumption, for future multi-use
 | Secondary interface | Typer CLI (`src/cvpal/interfaces/cli/`) |
 | AI engine | Provider-agnostic `TextCompletionPort`. Default adapter: `opencode` CLI, model `opencode-go/deepseek-v4-pro`. Second adapter (Claude Code CLI) exists to prove the abstraction. Only used by `rebuild_knowledge_base` - the primary MCP flow drafts documents with the *host's* model, no nested LLM call |
 | Document parsing | pdfplumber (+ hyperlink extraction), python-docx, odfpy, `pdftotext -layout` fallback |
-| Knowledge base | `data/knowledge-base.md` (source of truth) + optional `data/cv-knowledge-base.xlsx` export |
+| Knowledge base | `data/knowledge-base.md` (source of truth) |
 | Document rendering | `python-docx` + `soffice --headless` (local, no agent/API key needed) |
-| Data / sheet export | pandas, openpyxl |
-| Sheets sync | gspread + service account (not yet implemented) |
 
 See `AGENTS.md`'s Architecture section for the layer breakdown, the MCP server contract, and the
 Decision Log for the reasoning behind each choice below.
@@ -243,6 +241,5 @@ cvpal agents check                # round-trip a trivial prompt against the acti
    cover-letter conversational branch (voice confirmation vs. elicitation) end to end.
 2. Fix the UTN certificate URL extraction artifact in `data/knowledge-base.md` (deferred, not
    blocking).
-3. Optionally: Google Sheets sync from the `.xlsx` export, if useful for manual review.
-4. A standalone cover-letter use case for the CLI path, freelance profiles, web job search — in
+3. A standalone cover-letter use case for the CLI path, freelance profiles, web job search — in
    that order per the branch chain above.

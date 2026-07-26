@@ -79,7 +79,6 @@ class Settings:
 
         self.ingested_json: Path = self.data_dir / "ingested.json"
         self.knowledge_base_md: Path = self.data_dir / "knowledge-base.md"
-        self.workbook_xlsx: Path = self.data_dir / "cv-knowledge-base.xlsx"
         self.checkpoint_dir: Path = self.data_dir / ".checkpoints"
         self.outputs_dir: Path = self.data_dir / "outputs"
 

@@ -28,7 +28,6 @@ Homepage = "https://github.com/brunovt074/cv-pal"
 Issues = "https://github.com/brunovt074/cv-pal/issues"
 
 [project.optional-dependencies]
-xlsx = ["openpyxl>=3.1"]
 dev = [
     "pytest>=8.3",
     "ruff>=0.7",

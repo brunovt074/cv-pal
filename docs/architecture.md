@@ -1,18 +1,23 @@
 # CV-Pal — Arquitectura y funcionamiento
 
+> Nota: este documento quedó en español de una etapa anterior del proyecto y no se tradujo. La
+> referencia autoritativa y actualizada para contribuidores es `AGENTS.md` (inglés); `README.md`
+> tiene el quickstart. Este archivo es un complemento con más detalle narrativo, no la fuente de
+> verdad.
+
 ## 1. Visión general
 
 CV-Pal es una herramienta programática y **agent-agnostic** para adaptar CVs y cartas de
-presentación a ofertas de trabajo. Consolida ~50 CVs/cartas de presentación dispersas
-(PDF, DOCX, ODT, en múltiples stacks — Java, PHP, C#, JS, Python) en un único **knowledge base**
+presentación a ofertas de trabajo. Consolida CVs/cartas de presentación dispersas, en cualquier
+cantidad (PDF, DOCX, ODT, en múltiples stacks e idiomas) en un único **knowledge base**
 en inglés (`data/knowledge-base.md`), y luego cualquier agente de IA host (opencode, Claude Code)
 lo consume vía MCP para redactar un CV y carta a medida de una oferta — conversacionalmente, en la
 voz del autor, solo con material real.
 
 **Decisión central**: el conocimiento es un archivo markdown local (no versionado en git — es dato
 personal, ver `CV_DATA_DIR`) — cualquier agente lo lee nativamente, un humano lo edita a mano y lo
-diffea. El `.xlsx` es export opcional, no autoritativo. El maintainer del proyecto es el test
-fixture; el sistema recibe el usuario como parámetro, sin hardcodearlo.
+diffea. El maintainer del proyecto es el test fixture; el sistema recibe el usuario como
+parámetro, sin hardcodearlo.
 
 ---
 
@@ -26,7 +31,7 @@ los conecta — ningún use case o interfaz importa infraestructura directamente
 |------|-----------|-----------|
 | `domain` | `src/cvpal/domain/` | Modelos pydantic (`documents/`, `knowledge/`, `jobs/`, `generation/`), puertos como `typing.Protocol` (`ports/`), enum `Capability`, jerarquía de errores. Cero imports de infraestructura. |
 | `application` | `src/cvpal/application/` | Use cases (`use_cases/`), prompt templates (`prompts/`), servicios puros (`services/` — dedupe, checkpointing, parsing de respuestas, resolución de datos personales, `agent_view.py`, `markdown_sections.py`). Solo depende de `domain`. |
-| `infrastructure` | `src/cvpal/infrastructure/` | Adapters: `agents/` (CLI-driven text-completion), `parsers/` (PDF/DOCX/ODT), `persistence/` (markdown/json/xlsx, checkpoint store), `job_postings/` (text/file/URL sources), `rendering/` (`.docx`/`.pdf` local). |
+| `infrastructure` | `src/cvpal/infrastructure/` | Adapters: `agents/` (CLI-driven text-completion), `parsers/` (PDF/DOCX/ODT), `persistence/` (markdown/json, checkpoint store), `job_postings/` (text/file/URL sources), `rendering/` (`.docx`/`.pdf` local). |
 | `interfaces` | `src/cvpal/interfaces/cli/`, `src/cvpal/interfaces/mcp/` | Dos adaptadores sobre los mismos use cases. Ambos resuelven todo con `container.py`, nunca importan `infrastructure` directamente. |
 
 ---
@@ -95,7 +100,7 @@ un guess del agente.
 **Estructura**: `data/knowledge-base.md` — fuente de verdad, editable a mano, diff-friendly.
 Cada sección es una tabla markdown genérica + un bloque `Notes` libre. Una misma función de
 render/parseo funciona para `PersonalDataField`, `ExperienceBullet`, `SkillEntry`, y cualquier
-tipo record-based. El `.xlsx` (`data/cv-knowledge-base.xlsx`) es export opcional secundario.
+tipo record-based.
 
 ### Vistas
 
@@ -346,9 +351,8 @@ parsea, solo que produce una KB casi vacía. De ahí la heurística de conteo de
 2. `WebContentPort` adapter para ofertas por URL.
 3. Fix del artifact de extracción de la URL del certificado UTN (dos links concatenados
    en el PDF fuente).
-4. Google Sheets sync desde el `.xlsx` export.
-5. Perfiles freelance (`feature/freelance-profiles`).
-6. Web job search (`feature/web-job-search`).
+4. Perfiles freelance (`feature/freelance-profiles`).
+5. Web job search (`feature/web-job-search`).
 7. Transport HTTP/SSE de MCP (deliberadamente fuera de v1).
 8. Standalone cover-letter use case para la CLI.
 

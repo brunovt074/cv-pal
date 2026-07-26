@@ -10,9 +10,6 @@ records from ingestion into `data/knowledge-base.md`, the single source of truth
 downstream agents. Treat schema changes to `domain/knowledge/models.py` as high-stakes: they
 change both the markdown table shape and any downstream reader (`cv-generation`).
 
-`infrastructure/persistence/xlsx_exporter.py` produces `data/cv-knowledge-base.xlsx` as an
-**optional** secondary export for manual review in a spreadsheet — it is not the source of truth.
-
 ## When to read this skill
 
 Before changing dedupe logic, an extraction prompt, the personal-data correction rules, or the

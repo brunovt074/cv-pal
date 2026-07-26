@@ -11,7 +11,8 @@ Before writing any code, every agent MUST:
 
 1. Read this file completely
 2. Read `PROJECT_STATUS.md` to understand current state and branch chain
-3. Query engram (`mem_search` / `mem_context`) for prior decisions on this project
+3. If a persistent-memory tool (e.g. engram) is available in this environment, query it for prior
+   decisions on this project - skip this step if none is configured
 4. Identify which skill(s) apply to the task (see Auto-invoke table below)
 5. Read the relevant `skills/{name}/SKILL.md` file(s)
 6. Confirm the target branch before any file modification
@@ -26,9 +27,9 @@ Skipping this protocol produces inconsistent code and failed reviews.
 |-------|-------|
 | Name | CV-Pal |
 | Language | Python 3.12 |
-| Purpose | A programmatic, agent-agnostic tool for CV/cover-letter tailoring — consumed by AI agents (opencode, Claude Code) over MCP the same way they consume engram, not just a standalone pipeline. Consolidates ~50 CV/cover-letter documents into a knowledge base, then any host agent tailors a CV/cover letter to a job posting using it |
+| Purpose | A programmatic, agent-agnostic tool for CV/cover-letter tailoring — consumed by AI agents (opencode, Claude Code) over MCP, not just a standalone pipeline. Consolidates scattered CV/cover-letter documents (any number, multiple stacks/languages) into a knowledge base, then any host agent tailors a CV/cover letter to a job posting using it |
 | Architecture | Hexagonal (ports & adapters) — see below. Pipeline (ingest → build knowledge base) + two interface adapters: CLI (`cvpal ...`) and MCP server (`cvpal serve-mcp`) |
-| Knowledge base | `data/knowledge-base.md` — source of truth, versioned in git, editable by a human or any agent. `data/cv-knowledge-base.xlsx` is an optional secondary export, not authoritative |
+| Knowledge base | `data/knowledge-base.md` — source of truth, editable by a human or any agent |
 | Primary consumption path | MCP over stdio (`cvpal serve-mcp`) — an agent calls the `cv_pal` prompt with a job posting, gets an assembled one-shot prompt (lean knowledge base + protocol), and drafts + prints the CV/cover letter itself. See "MCP server" below |
 | AI engine | Provider-agnostic by design — see Architecture. Default today: `opencode` CLI, model `opencode-go/deepseek-v4-pro`. A second CLI adapter (Claude Code) already exists to prove the abstraction holds. Only used for `rebuild_knowledge_base` (batch extraction) - the primary MCP flow has no LLM call inside cv-pal at all, the host agent does the writing |
 | API + CLI | FastAPI (not planned anymore, superseded by MCP) + Typer CLI (`src/cvpal/interfaces/cli/`) + MCP server (`src/cvpal/interfaces/mcp/`) |
@@ -46,7 +47,7 @@ empty) before merging any change that touches these layers.
 |-------|----------|----------|
 | Domain | `src/cvpal/domain/` | Pydantic models (`documents/`, `knowledge/`, `jobs/`, `generation/`), ports as `typing.Protocol` (`ports/`), `Capability` enum, error hierarchy. Zero infrastructure imports |
 | Application | `src/cvpal/application/` | Use cases (`use_cases/`), prompt templates (`prompts/`), pure services (`services/` — dedupe, checkpointing helpers, response parsing, personal-data correction, `agent_view.py` lean projection, `markdown_sections.py`). Depends only on `domain` |
-| Infrastructure | `src/cvpal/infrastructure/` | Port implementations: `agents/` (CLI-driven text-completion adapters), `parsers/` (PDF/DOCX/ODT extraction), `persistence/` (markdown/JSON/xlsx repositories, checkpoint store), `job_postings/` (text/file/URL sources), `rendering/` (local `.docx`/`.pdf` renderer, no agent needed) |
+| Infrastructure | `src/cvpal/infrastructure/` | Port implementations: `agents/` (CLI-driven text-completion adapters), `parsers/` (PDF/DOCX/ODT extraction), `persistence/` (markdown/JSON repositories, checkpoint store), `job_postings/` (text/file/URL sources), `rendering/` (local `.docx`/`.pdf` renderer, no agent needed) |
 | Interfaces | `src/cvpal/interfaces/cli/`, `src/cvpal/interfaces/mcp/` | Two adapters over the same use cases: Typer CLI and an MCP server (stdio). Both resolve everything through `container.py`, never import `infrastructure` directly |
 
 ### MCP server (primary interface)
@@ -128,11 +129,14 @@ ruff check src tests && pytest
 ## CLI Commands
 
 ```bash
-cvpal ingest                                     # Parse changed source docs (CV_RAW_DIR) into data/ingested.json
+cvpal init                                        # Interactive setup wizard (config.toml, data dir, migration)
+cvpal doctor                                      # Environment diagnostics
+cvpal ingest                                       # Parse changed source docs (CV_RAW_DIR) into data/ingested.json
 cvpal kb build                                    # Build/refresh data/knowledge-base.md (only changed sections)
 cvpal kb audit                                    # Report personal-data fields with multiple distinct values
 cvpal tailor --job-text "..." --format pdf        # Generate a tailored CV (markdown/docx/pdf)
 cvpal tailor --job-file posting.docx --format docx # ...from a local .txt/.md/.docx file
+cvpal clean --all                                 # Delete generated outputs
 cvpal agents list                                 # List registered agent providers
 cvpal agents check                                # Round-trip a trivial prompt against the configured agent
 cvpal serve-mcp                                   # Start the MCP server over stdio (primary interface)
@@ -228,17 +232,17 @@ Architectural decisions made — do not relitigate without strong evidence:
 |----------|-----------|
 | Full app (not just Sheets + Claude web) | Historias 3-4 need real code: platform integrations and web search can't run from Claude web alone |
 | Hexagonal architecture (`domain`/`application`/`infrastructure`/`interfaces`) | The system must be agent-agnostic today (opencode for testing) and provider-agnostic tomorrow (Claude Code, Anthropic SDK, or anything else) without touching use cases. Confirmed explicitly; the LLM backend was already a single hardcoded call site (`llm/opencode_client.py`) that every analytics module imported directly, which would have meant touching every call site to add a second provider |
-| `data/knowledge-base.md` replaces `.xlsx` as the source of truth | Decided in an earlier analysis pass, reconfirmed this session: any agent reads markdown natively without a parsing step; a human can hand-edit it directly and diff it in git. The `.xlsx` export (`infrastructure/persistence/xlsx_exporter.py`) is kept as an optional secondary output for spreadsheet review, not authoritative |
+| `data/knowledge-base.md` replaces `.xlsx` as the source of truth | Decided in an earlier analysis pass: any agent reads markdown natively without a parsing step; a human can hand-edit it directly and diff it in git. An optional `.xlsx` export existed for a while as a secondary output for spreadsheet review, but was never wired into any CLI/MCP command - removed outright rather than kept as unreachable code (`infrastructure/persistence/xlsx_exporter.py` and `cv_version_inventory.py`, both deleted) |
 | Extraction prompts return JSON validated against domain models, never markdown text directly | A deterministic renderer (`markdown_knowledge_repository.save()`) turns the validated `KnowledgeBase` into markdown afterward. This makes `build_knowledge_base()` testable with a scripted `FakeTextAgent` and no live LLM call, and guarantees the file's shape regardless of how faithfully an agent follows formatting instructions |
 | Markdown knowledge base uses per-field tables + a free-form `Notes` section, not bespoke prose formatting per section type | One generic table renderer/parser works for every record-based section (`PersonalDataField`, `ExperienceBullet`, `SkillEntry`, ...) — far less code than a bespoke parser per section, and just as human-editable. `Notes` is preserved verbatim across `cvpal kb build` reruns for anything that doesn't fit a table row |
 | Which personal-data value is "current" (phone, LinkedIn, GitHub) is a hardcoded fact, never an LLM guess | `application/services/personal_data_resolution.py` applies known-authoritative values as a deterministic post-processing pass. An agent extracts all distinct values found across the corpus; only a human can say which one is real. Caught a real substring-matching bug here during implementation ("-dev" matching inside "-developer") — covered by `tests/application/test_personal_data_resolution.py` against the actual corpus's known-inconsistent values |
 | Knowledge base content in English by default | Avoids maintaining ES/EN duplicates; translation happens on-the-fly per job application at tailoring time |
 | Tailored CV/cover-letter output defaults to English, never inferred from the job posting's language | Explicit user decision, superseding the earlier posting-language-detection default. `tailor_cv()` (CLI path) and `_cv_pal()` (MCP path) now resolve `language_override or "en"` — no `detect_language` call in either. Only an explicit `--language`/`language` argument changes the output language; `infrastructure/parsers/sections.py:detect_language` is still used for ingestion (tagging source documents' language), unrelated to this |
-| Voice/tone extracted from existing cover letters, as one section of the same knowledge-base build pass | The letters are the ground truth for "sounding like him" — no separate interview or pipeline stage needed |
+| Voice/tone extracted from existing cover letters, as one section of the same knowledge-base build pass | The letters are the ground truth for sounding like the author — no separate interview or pipeline stage needed |
 | Freelance profiles = human-in-the-loop | Upwork/Fiverr ToS prohibit account automation; agent generates content, human pastes/reviews. API automation only where a real API exists (e.g. Himalayas/boards) |
 | Text-generation tasks go through a `TextCompletionPort`, default adapter `opencode` CLI (`opencode-go/deepseek-v4-pro`) | Explicit user decision. `infrastructure/agents/cli/opencode.py` shells out to the already-authenticated `opencode` CLI instead of reading its credential store directly. A second adapter (`cli/claude_code.py`, Claude Code CLI) exists specifically to prove the `CliAgentSpec` abstraction generalizes beyond opencode, not just in theory |
 | Per-section agent calls, not one giant call | A single call covering all CV sections at once triggers unreliable behavior in non-interactive CLI agent modes: tool-call permissions are auto-denied, so a large response the model tries to write to a scratch file silently produces empty output. Splitting into one small call per canonical section (personal_data, summary, experience, education+certifications, skills, projects, languages, voice_profile) keeps outputs small enough to return reliably |
-| `source_files` capped at 3 representative files per record | Uncapped lists blew up JSON output size for near-universal facts (e.g. a skill appearing in 30+ of 38 CVs), truncating the response mid-string. Traceability doesn't need every duplicate, just a representative sample |
+| `source_files` capped at 3 representative files per record | Uncapped lists blew up JSON output size for near-universal facts (e.g. a skill appearing in most of a large CV corpus), truncating the response mid-string. Traceability doesn't need every duplicate, just a representative sample |
 | Checkpoint every agent-backed structuring step to disk | Individual pipeline runs can exceed a harness's background-execution time limit; checkpointing each step's result (`data/.checkpoints/`, gitignored, via `CheckpointStorePort`) lets `cvpal kb build` be re-run in short bursts, resuming instead of re-paying completed calls |
 | Checkpoints are content-addressed (fingerprint of the section's input + a `PROMPT_VERSION` constant), not existence-based | The prior scheme reused a checkpoint just because the file existed, regardless of whether the source CVs had changed - stale on any edit, and forced a full `rm -rf .checkpoints` to recompute even a single changed section. Now a section is only recomputed when its own deduped input actually changed, which makes `rebuild_knowledge_base` genuinely safe to call defensively (zero agent calls when nothing changed) - the property the MCP surface depends on |
 | Ingest skips re-parsing a file whose mtime+size match the previous run | Parsing 48 PDFs/DOCX/ODT isn't free either; `ingest_documents(..., previous=...)` reuses the cached `RawDocument` for unchanged files, so only new/edited CVs pay the extraction cost |
@@ -252,7 +256,7 @@ Architectural decisions made — do not relitigate without strong evidence:
 | `update_knowledge_base` rejects an apparent near-total wipe unless `force=True` | The markdown parser is deliberately tolerant (a design goal for hand edits), which means "does it parse" is not a strong safety check - garbage input still parses, into a mostly-empty `KnowledgeBase`. `application/use_cases/update_knowledge_base.py` compares record counts before/after and refuses a drop past a retention threshold, backing up the previous file regardless |
 | Multi-user is a parameter, not implemented - the project maintainer's own CVs are the test fixture | The user's explicit direction: design every new piece to receive the knowledge base/paths as data, never hardcode an identity. `markdown_knowledge_repository.py`'s header, `personal_data_resolution.py`'s `PREFERRED_VALUES`, and `output_naming.py`'s user slug now read from `CVPAL_USER_NAME`/`CVPAL_PHONE`/`CVPAL_LINKEDIN`/`CVPAL_GITHUB`/`CVPAL_USER_SLUG` env vars (fictitious defaults) rather than a hardcoded name - an interim escape valve ahead of the real per-user config file (`~/.config/cvpal/config.toml`, see PROJECT_STATUS); `config.Settings` paths aren't yet namespaced per user either |
 | v1 targets only opencode and Claude Code, both over stdio - no HTTP/SSE, no ChatGPT/Pi | ChatGPT's MCP support is remote-connector-only (Pro/Business gated) and Pi has no known MCP support - both would need a different transport and auth model, deliberately out of scope until there's a concrete need |
-| Engram consulted every session | Persistent memory protocol is globally active; always `mem_search`/`mem_context` at start, `mem_save` after decisions |
+| Engram consulted every session, on this maintainer's machine | Not a project requirement - a personal workflow preference of whoever is developing this particular checkout. Contributors without engram (or any persistent-memory tool) configured skip that step entirely, see Agent Startup Protocol above |
 
 ---
 

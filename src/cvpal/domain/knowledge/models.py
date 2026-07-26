@@ -72,8 +72,7 @@ class KnowledgeBase(BaseModel):
     """The single, versioned source of truth for all CV content.
 
     Rendered to/parsed from `data/knowledge-base.md` by
-    `infrastructure.persistence.markdown_knowledge_repository`. Also the
-    input to the optional `.xlsx` export.
+    `infrastructure.persistence.markdown_knowledge_repository`.
     """
 
     personal_data: list[PersonalDataField] = Field(default_factory=list)
@@ -92,17 +91,3 @@ class KnowledgeBase(BaseModel):
             "across `kb build` regenerations, unlike the structured sections above."
         ),
     )
-
-
-class CVVersionEntry(BaseModel):
-    source_file: str
-    stack: str
-    source_language: str
-    is_most_recent_variant: bool = False
-
-
-class CoverLetterEntry(BaseModel):
-    source_file: str
-    source_language: str
-    original_text: str
-    english_text: str

@@ -17,8 +17,7 @@ breakdown.
    experience, education, certifications, skills, projects, languages, voice profile), validated
    against typed models and rendered to a single markdown file — the source of truth. Every
    section is checkpointed by content fingerprint, so re-running costs nothing when nothing
-   changed. An optional `.xlsx` export exists for spreadsheet review (`pip install cv-pal[xlsx]`),
-   never authoritative.
+   changed.
 3. **MCP server** (`cvpal-mcp` / `cvpal serve-mcp`) — your agent asks for a lean view of the
    knowledge base (no provenance metadata, roughly 44% of the full size) plus the job posting, and
    drafts the CV itself, then conversationally the cover letter — asking about tone if it hasn't
@@ -107,10 +106,7 @@ cvpal init                    # (re)run the setup wizard
   (single source of truth for contributors)
 - `PROJECT_STATUS.md` — current implementation state and branch history
 - `skills/` — focused guides per area (extraction, voice, generation, MCP server)
-
-## Support
-
-If cv-pal is useful to you, consider supporting its development — donation links go here.
+- `CONTRIBUTING.md` — dev setup, running tests/lint, branch and commit conventions
 
 ## License
 

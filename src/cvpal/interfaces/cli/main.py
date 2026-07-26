@@ -22,7 +22,6 @@ from cvpal.domain.errors import DocumentRenderError
 from cvpal.domain.generation.models import DocumentFormat
 from cvpal.domain.ports.text_completion import CompletionRequest
 from cvpal.domain.user.profile import UserProfile
-from cvpal.infrastructure.agents.registry import spec_for
 
 load_dotenv()
 
@@ -271,7 +270,7 @@ def _migrate_legacy_data(data_dir: Path) -> None:
     if not typer.confirm(f"Found an existing knowledge base at {legacy_kb} - copy it here?", default=True):
         return
     data_dir.mkdir(parents=True, exist_ok=True)
-    for name in ("knowledge-base.md", "cv-knowledge-base.xlsx", "ingested.json"):
+    for name in ("knowledge-base.md", "ingested.json"):
         src = legacy_dir / name
         if src.exists():
             shutil.copy2(src, data_dir / name)
@@ -389,11 +388,10 @@ def doctor() -> None:
         "Run 'cvpal ingest' then 'cvpal kb build'.",
     )
 
-    spec = spec_for(settings.agent_name)
-    if spec is None:
+    binary = Container.agent_binary(settings.agent_name)
+    if binary is None:
         check(f"Agent '{settings.agent_name}' recognized", False, "Run 'cvpal agents list' for valid providers.")
     else:
-        binary = os.environ.get(spec.binary_env_var, spec.default_binary)
         check(
             f"Agent '{settings.agent_name}' binary ('{binary}') in PATH",
             shutil.which(binary) is not None,
