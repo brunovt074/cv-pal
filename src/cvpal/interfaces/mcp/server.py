@@ -33,7 +33,7 @@ from cvpal.application.use_cases.update_knowledge_base import (
 from cvpal.config import get_settings
 from cvpal.container import Container
 from cvpal.domain.capabilities import Capability
-from cvpal.domain.errors import CapabilityNotSupportedError, DocumentRenderError
+from cvpal.domain.errors import CapabilityNotSupportedError, DocumentRenderError, JobPostingFetchError
 from cvpal.domain.generation.models import DocumentFormat
 
 mcp = FastMCP("cvpal")
@@ -52,20 +52,25 @@ def _cv_pal(
     container: Container,
     job_posting_text: str,
     job_posting_file: str,
+    job_posting_url: str,
     language: str,
 ) -> str:
     if not container.knowledge_repository.exists():
         return _NO_KB_MESSAGE
-    if bool(job_posting_text) == bool(job_posting_file):
-        return "Provide exactly one of job_posting_text or job_posting_file."
+    provided = [v for v in (job_posting_text, job_posting_file, job_posting_url) if v]
+    if len(provided) != 1:
+        return "Provide exactly one of job_posting_text, job_posting_file, or job_posting_url."
 
     source = container.job_posting_source(
         text=job_posting_text or None,
         file=Path(job_posting_file) if job_posting_file else None,
+        url=job_posting_url or None,
     )
-    posting = source.read()
-    detected = container.detect_language(posting.raw_text)
-    resolved_language = language or (detected if detected != "unknown" else "en")
+    try:
+        posting = source.read()
+    except JobPostingFetchError as exc:
+        return str(exc)
+    resolved_language = language or "en"
 
     kb = container.knowledge_repository.load()
     agent_view = render_agent_view(kb)
@@ -73,13 +78,19 @@ def _cv_pal(
 
 
 @mcp.prompt()
-def cv_pal(job_posting_text: str = "", job_posting_file: str = "", language: str = "") -> str:
+def cv_pal(
+    job_posting_text: str = "",
+    job_posting_file: str = "",
+    job_posting_url: str = "",
+    language: str = "",
+) -> str:
     """Tailor a CV (and, on request, a cover letter) to a job posting using
     the user's knowledge base. Provide exactly one of job_posting_text
-    (pasted text) or job_posting_file (path to a .txt/.md/.docx file).
-    Leave language empty to infer it from the posting.
+    (pasted text), job_posting_file (path to a .txt/.md/.docx file), or
+    job_posting_url (a link to the posting - fetched and stripped to
+    readable text). Leave language empty to default to English.
     """
-    return _cv_pal(_container(), job_posting_text, job_posting_file, language)
+    return _cv_pal(_container(), job_posting_text, job_posting_file, job_posting_url, language)
 
 
 def _get_cv_material(container: Container) -> str:

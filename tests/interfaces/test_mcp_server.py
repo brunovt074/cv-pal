@@ -3,6 +3,7 @@ import json
 from cvpal.config import Settings
 from cvpal.container import Container
 from cvpal.domain.documents.models import RawDocument
+from cvpal.domain.errors import JobPostingFetchError
 from cvpal.domain.knowledge.models import ExperienceBullet, KnowledgeBase, PersonalDataField
 from cvpal.domain.knowledge.voice import VoiceProfile
 from cvpal.interfaces.mcp import server
@@ -43,23 +44,34 @@ def _seed_kb(container: Container) -> KnowledgeBase:
 
 def test_cv_pal_reports_missing_knowledge_base(tmp_path):
     container = _container(tmp_path)
-    result = server._cv_pal(container, "some posting", "", "")
+    result = server._cv_pal(container, "some posting", "", "", "")
     assert result == server._NO_KB_MESSAGE
 
 
-def test_cv_pal_requires_exactly_one_of_text_or_file(tmp_path):
+def test_cv_pal_requires_exactly_one_of_text_file_or_url(tmp_path):
     container = _container(tmp_path)
     _seed_kb(container)
-    assert "exactly one" in server._cv_pal(container, "", "", "")
-    assert "exactly one" in server._cv_pal(container, "text", "file.md", "")
+    assert "exactly one" in server._cv_pal(container, "", "", "", "")
+    assert "exactly one" in server._cv_pal(container, "text", "file.md", "", "")
+    assert "exactly one" in server._cv_pal(container, "text", "", "https://example.com/job", "")
+    assert "exactly one" in server._cv_pal(container, "", "file.md", "https://example.com/job", "")
 
 
 def test_cv_pal_assembles_prompt_with_material_and_posting(tmp_path):
     container = _container(tmp_path)
     _seed_kb(container)
-    result = server._cv_pal(container, "UNIQUE_POSTING_MARKER", "", "en")
+    result = server._cv_pal(container, "UNIQUE_POSTING_MARKER", "", "", "en")
     assert "UNIQUE_POSTING_MARKER" in result
     assert "Acme" in result
+    assert "Write in en" in result
+
+
+def test_cv_pal_defaults_to_english_even_for_a_non_english_posting(tmp_path):
+    container = _container(tmp_path)
+    _seed_kb(container)
+    result = server._cv_pal(
+        container, "Se busca desarrollador backend con experiencia en Java", "", "", ""
+    )
     assert "Write in en" in result
 
 
@@ -68,9 +80,38 @@ def test_cv_pal_reads_posting_from_file(tmp_path):
     _seed_kb(container)
     posting_file = tmp_path / "posting.txt"
     posting_file.write_text("FILE_POSTING_MARKER")
-    result = server._cv_pal(container, "", str(posting_file), "es")
+    result = server._cv_pal(container, "", str(posting_file), "", "es")
     assert "FILE_POSTING_MARKER" in result
     assert "Write in es" in result
+
+
+def test_cv_pal_reads_posting_from_url(tmp_path, monkeypatch):
+    container = _container(tmp_path)
+    _seed_kb(container)
+
+    class _FakeWebContent:
+        def fetch(self, url: str) -> str:
+            assert url == "https://example.com/job"
+            return "URL_POSTING_MARKER"
+
+    monkeypatch.setattr(type(container), "web_content", property(lambda self: _FakeWebContent()))
+
+    result = server._cv_pal(container, "", "", "https://example.com/job", "en")
+    assert "URL_POSTING_MARKER" in result
+
+
+def test_cv_pal_reports_fetch_failure_from_url(tmp_path, monkeypatch):
+    container = _container(tmp_path)
+    _seed_kb(container)
+
+    class _FailingWebContent:
+        def fetch(self, url: str) -> str:
+            raise JobPostingFetchError(url, "connection refused")
+
+    monkeypatch.setattr(type(container), "web_content", property(lambda self: _FailingWebContent()))
+
+    result = server._cv_pal(container, "", "", "https://example.com/job", "en")
+    assert "connection refused" in result
 
 
 # --- get_cv_material ---

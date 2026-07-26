@@ -142,9 +142,11 @@ master
   directly; → `.pdf` via a temp `.docx` + `soffice --headless --convert-to pdf`. No agent, no API
   key - corrects an earlier assumption in this project that Anthropic Agent Skills were required.
 - Wired into `cvpal tailor --format docx|pdf` and the MCP `render_document` tool.
+- Default font forced to Arial on every style (Normal/Heading 1-3/List Bullet); `[text](url)`
+  markdown links and bare URLs render as real clickable Word hyperlinks, not literal text.
 - Tests generate a real PDF via `soffice` (skipped if not installed) and assert on `%PDF` magic
   bytes and non-empty output, plus a `.docx` reopened with `python-docx` and asserted on headings/
-  bullets/bold.
+  bullets/bold/hyperlinks/font.
 
 ### Knowledge base build [COMPLETE, verified against the real corpus]
 **Branch**: `feature/hexagonal-agents` (content-addressed checkpointing added in `feature/mcp-server`)
@@ -162,23 +164,26 @@ master
   3 languages, voice profile present. One known pre-existing extraction artifact (a UTN
   certificate URL, corrupted by two concatenated links in the source PDF) remains deferred.
 
-### CV tailoring [COMPLETE for text/file postings; URL deferred]
+### CV tailoring [COMPLETE for text/file/URL postings]
 **Branch**: `feature/hexagonal-agents`, extended in `feature/mcp-server`
 
 - CLI path: `application/use_cases/tailor_cv.py` + `application/prompts/tailoring.py`, now with
-  `--format markdown|docx|pdf`.
+  `--format markdown|docx|pdf` and `--job-url`.
 - MCP path (primary): `application/prompts/cv_pal.py` assembles the one-shot conversational
-  prompt; the host agent drafts and prints the result.
-- `infrastructure/job_postings/`: text, file (`.txt`/`.md`/`.docx`), URL (still raises
-  `CapabilityNotSupportedError` — needs a `WebContentPort` adapter, not opencode's fault per se).
-- **Not yet implemented**: job posting by URL, a standalone (non-conversational) cover-letter use
-  case for the CLI path.
+  prompt; the host agent drafts and prints the result. `cv_pal` prompt now also accepts
+  `job_posting_url`.
+- `infrastructure/job_postings/`: text, file (`.txt`/`.md`/`.docx`), URL — now wired to a real
+  `WebContentPort` adapter (`infrastructure/web_content/http_web_content.py`, `HttpWebContent`):
+  plain `urllib` fetch + stdlib `html.parser` tag-stripping, no agent needed (same reasoning as
+  local document rendering). `JobPostingFetchError` surfaces fetch/empty-page failures as a
+  message rather than a stack trace.
+- **Not yet implemented**: a standalone (non-conversational) cover-letter use case for the CLI
+  path.
 
 ### Not started
 - Google Sheets sync (small addition, can be picked up anytime)
-- `WebContentPort` adapter for job-posting-by-URL
 - Freelance profiles
-- Web job search (future iteration)
+- Web job search (future iteration — can reuse the `WebContentPort` adapter above)
 - HTTP/SSE MCP transport (deliberately out of v1 scope — see Decision Log)
 
 ---
@@ -209,6 +214,7 @@ prompt's wording without bumping its `PROMPT_VERSION`).
 ```bash
 cvpal tailor --job-text "Backend Java developer, Spring Boot, remote" --format pdf
 cvpal tailor --job-file /path/to/posting.docx --language es --format docx
+cvpal tailor --job-url "https://boards.example.com/jobs/123" --format pdf
 ```
 
 ## Serving cv-pal to an agent (primary path)
@@ -235,9 +241,8 @@ cvpal agents check                # round-trip a trivial prompt against the acti
 1. Interactive verification of the `cv_pal` MCP *prompt* primitive itself (not just the
    `get_cv_material` tool) from an interactive opencode/Claude Code session, to confirm the
    cover-letter conversational branch (voice confirmation vs. elicitation) end to end.
-2. `WebContentPort` adapter so job postings can be given by URL.
-3. Fix the UTN certificate URL extraction artifact in `data/knowledge-base.md` (deferred, not
+2. Fix the UTN certificate URL extraction artifact in `data/knowledge-base.md` (deferred, not
    blocking).
-4. Optionally: Google Sheets sync from the `.xlsx` export, if useful for manual review.
-5. A standalone cover-letter use case for the CLI path, freelance profiles, web job search — in
+3. Optionally: Google Sheets sync from the `.xlsx` export, if useful for manual review.
+4. A standalone cover-letter use case for the CLI path, freelance profiles, web job search — in
    that order per the branch chain above.

@@ -33,3 +33,9 @@ class KnowledgeBaseNotFoundError(CvPalError):
 
 class DocumentRenderError(CvPalError):
     pass
+
+
+class JobPostingFetchError(CvPalError):
+    def __init__(self, url: str, detail: str) -> None:
+        self.url = url
+        super().__init__(f"Failed to fetch job posting from '{url}': {detail}")

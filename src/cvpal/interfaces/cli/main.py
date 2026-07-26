@@ -135,10 +135,10 @@ def tailor(
         None, "--job-file", help="Job posting file (.txt/.md/.docx)"
     ),
     job_url: str = typer.Option(
-        None, "--job-url", help="Job posting URL (not yet supported by any agent - see AGENTS.md)"
+        None, "--job-url", help="Job posting URL - fetched and stripped to readable text"
     ),
     language: str = typer.Option(
-        None, "--language", help="Force output language (e.g. 'en', 'es') instead of auto-detecting"
+        None, "--language", help="Output language (e.g. 'en', 'es'); defaults to English"
     ),
     output: Path = typer.Option(
         None, "--output", "-o", help="Where to write the tailored CV (default: data/outputs/)"
@@ -171,9 +171,7 @@ def tailor(
     source = container.job_posting_source(text=job_text, file=job_file, url=job_url)
     knowledge_base_markdown = settings.knowledge_base_md.read_text()
 
-    tailored = tailor_cv(
-        source, knowledge_base_markdown, agent, container.detect_language, language_override=language
-    )
+    tailored = tailor_cv(source, knowledge_base_markdown, agent, language_override=language)
 
     extension = {"markdown": "md", "docx": "docx", "pdf": "pdf"}[fmt.value]
     output_path = output or (settings.outputs_dir / f"cv-tailored-{tailored.language}.{extension}")

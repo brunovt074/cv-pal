@@ -19,7 +19,8 @@ rendering (`infrastructure/rendering/`).
 ## When to read this skill
 
 Before writing or modifying either tailoring prompt, before touching `infrastructure/rendering/`
-or a `WebContentPort` adapter, before changing how the knowledge base is loaded into context.
+or `infrastructure/web_content/` (the `WebContentPort` adapter), before changing how the knowledge
+base is loaded into context.
 
 ## Principles
 
@@ -33,11 +34,13 @@ or a `WebContentPort` adapter, before changing how the knowledge base is loaded 
   stripping, token cost). The CLI path (`tailor_cv.py`) still passes the full markdown as-is,
   since it's a single cv-pal-side agent call, not a host-side conversation - the same
   optimization could be applied there later if it matters.
-- **Language detection and on-the-fly translation.** Output language is inferred from the job
-  posting text (`infrastructure/parsers/sections.py:detect_language`, injected as a callable — see
-  the dependency-injection note in `container.py`) unless overridden. The knowledge base stays
-  English; translation happens only at generation time, guided by the language-independent voice
-  traits (see `voice-style` skill) so tone survives translation.
+- **Output language defaults to English, on-the-fly translation only on request.** `tailor_cv()`
+  and `_cv_pal()` resolve `language_override or "en"` — the job posting's language is never used to
+  pick the output language. Only an explicit `--language`/`language` argument (CLI) or the user
+  asking mid-conversation (MCP) changes it. The knowledge base stays English; translation happens
+  only at generation time, guided by the language-independent voice traits (see `voice-style`
+  skill) so tone survives translation. `infrastructure/parsers/sections.py:detect_language` still
+  exists but is only used during ingestion to tag source documents' language, not for this.
 - **Never fabricate experience.** Both prompts state firmly: use ONLY material in the knowledge
   base; if the posting calls for something absent, honestly omit it or frame the closest real,
   adjacent experience — never invent a skill, certification, or project.
@@ -55,18 +58,22 @@ or a `WebContentPort` adapter, before changing how the knowledge base is loaded 
   MCP `render_document` tool go through `container.document_renderer`. It only covers the markdown
   shape the tailoring prompts actually produce (headings, bold, bullets, paragraphs) - not a
   general-purpose renderer.
-- **Fetching a job posting URL** still needs a `WebContentPort` adapter
-  (`domain/ports/web_content.py`) - `infrastructure/job_postings/url_source.py` raises
-  `CapabilityNotSupportedError` until one is registered. This is **not** a hard capability gap in
-  opencode itself — it has a native `webfetch` tool and MCP support — the actual blocker is that
-  its non-interactive `run` mode auto-denies tool permissions with no one to approve them
-  (`opencode run --auto` may lift this; not exercised yet). Don't assume opencode categorically
-  can't do this when deciding how to wire the adapter.
+- **Fetching a job posting by URL needs no agent either.** `infrastructure/web_content/
+  http_web_content.py` (`HttpWebContent`) implements `WebContentPort` (`domain/ports/
+  web_content.py`) as a plain `urllib` fetch + stdlib `html.parser` tag-stripping — same
+  local/deterministic reasoning as document rendering above, not an agent capability. Wired via
+  `container.web_content` into `UrlJobPostingSource`; reachable from `cvpal tailor --job-url` (CLI)
+  and the MCP `cv_pal` prompt's `job_posting_url` argument. `JobPostingFetchError` surfaces
+  network/empty-page failures as a message, not a stack trace. This was previously blocked on
+  opencode's non-interactive `run` mode auto-denying its native `webfetch` tool's permissions — a
+  local adapter sidesteps that entirely, the same way `DOCUMENT_RENDER` bypassed agent-capability
+  negotiation.
 
 ## Output
 
-- CLI: `cvpal tailor --job-text "..." --format pdf` (or `--job-file posting.docx`, `docx`,
-  `markdown`) writes `data/outputs/cv-tailored-{lang}.{ext}` (or a path via `--output`).
+- CLI: `cvpal tailor --job-text "..." --format pdf` (or `--job-file posting.docx`, `--job-url
+  https://...`, `docx`, `markdown`) writes `data/outputs/cv-tailored-{lang}.{ext}` (or a path via
+  `--output`).
 - MCP: the host prints the CV/cover letter in its own conversation; `render_document` converts
   whatever the host wrote into a real file under `data/outputs/` on request.
 
@@ -77,8 +84,11 @@ or a `WebContentPort` adapter, before changing how the knowledge base is loaded 
   `tests/application/test_cv_pal_prompt.py`) — asserts posting/material/voice-branch presence. No
   live agent call in the automated suite for either.
 - Unit-test `LocalDocumentRenderer` (see `tests/infrastructure/test_local_document_renderer.py`) —
-  `.docx` opened back with `python-docx` and asserted on headings/bullets/bold; `.pdf` skipped if
-  `soffice` isn't installed, otherwise asserted to start with `%PDF` and be non-empty.
+  `.docx` opened back with `python-docx` and asserted on headings/bullets/bold/hyperlinks/font;
+  `.pdf` skipped if `soffice` isn't installed, otherwise asserted to start with `%PDF` and be
+  non-empty.
+- Unit-test `HttpWebContent` (see `tests/infrastructure/test_web_content.py`) with
+  `urllib.request.urlopen` mocked — no real network call in the automated suite.
 - End-to-end verification is manual: run `cvpal tailor` against a real posting, or drive the
   `cv_pal` MCP prompt from opencode/Claude Code and read the result — see the `verify` skill's
   general guidance on driving real behavior instead of only asserting on code structure.

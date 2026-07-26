@@ -6,25 +6,23 @@ which isn't wired to any agent yet (see domain/ports/document_render.py).
 
 from __future__ import annotations
 
-from typing import Callable
-
 from cvpal.application.prompts.tailoring import tailor_cv_prompt
 from cvpal.domain.generation.models import DocumentFormat, TailoredDocument
 from cvpal.domain.ports.job_posting_source import JobPostingSourcePort
 from cvpal.domain.ports.text_completion import CompletionRequest, TextCompletionPort
+
+_DEFAULT_LANGUAGE = "en"
 
 
 def tailor_cv(
     job_posting_source: JobPostingSourcePort,
     knowledge_base_markdown: str,
     agent: TextCompletionPort,
-    detect_language: Callable[[str], str],
     *,
     language_override: str | None = None,
 ) -> TailoredDocument:
     posting = job_posting_source.read()
-    detected = detect_language(posting.raw_text)
-    language = language_override or (detected if detected != "unknown" else "en")
+    language = language_override or _DEFAULT_LANGUAGE
 
     prompt = tailor_cv_prompt(knowledge_base_markdown, posting.raw_text, language)
     result = agent.complete(CompletionRequest(prompt=prompt))

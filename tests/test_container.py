@@ -6,6 +6,8 @@ from cvpal.config import Settings
 from cvpal.container import Container
 from cvpal.domain.capabilities import Capability
 from cvpal.domain.errors import CapabilityNotSupportedError
+from cvpal.infrastructure.job_postings.url_source import UrlJobPostingSource
+from cvpal.infrastructure.web_content.http_web_content import HttpWebContent
 
 
 def _settings(agent_name: str) -> Settings:
@@ -31,3 +33,10 @@ def test_agent_is_built_once_and_cached():
     first = container.agent
     second = container.agent
     assert first is second
+
+
+def test_job_posting_source_wires_a_real_web_content_port_for_urls():
+    container = Container(_settings("opencode"))
+    source = container.job_posting_source(url="https://example.com/job")
+    assert isinstance(source, UrlJobPostingSource)
+    assert isinstance(container.web_content, HttpWebContent)

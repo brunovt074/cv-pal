@@ -16,34 +16,102 @@ import tempfile
 from pathlib import Path
 
 from docx import Document
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 from cvpal.domain.errors import DocumentRenderError
 from cvpal.domain.generation.models import DocumentFormat
 
 _SOFFICE_TIMEOUT_SECONDS = 60
-_BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
+_DEFAULT_FONT = "Arial"
+_HYPERLINK_COLOR = "0563C1"
+_STYLED_TEXT_STYLES = ("Normal", "Heading 1", "Heading 2", "Heading 3", "List Bullet")
+_TRAILING_URL_PUNCTUATION = ".,;:"
+
+_INLINE_PATTERN = re.compile(
+    r"\*\*(?P<bold>.+?)\*\*"
+    r"|\[(?P<link_text>[^\]]+)\]\((?P<link_url>[^\s)]+)\)"
+    r"|(?P<bare_url>https?://[^\s)]+)"
+)
+
+
+def _apply_default_font(document: Document) -> None:
+    for style_name in _STYLED_TEXT_STYLES:
+        style = document.styles[style_name]
+        style.font.name = _DEFAULT_FONT
+        fonts = style.element.get_or_add_rPr().find(qn("w:rFonts"))
+        for theme_attr in ("w:asciiTheme", "w:hAnsiTheme", "w:eastAsiaTheme", "w:cstheme"):
+            if fonts.get(qn(theme_attr)) is not None:
+                del fonts.attrib[qn(theme_attr)]
+        fonts.set(qn("w:eastAsia"), _DEFAULT_FONT)
+        fonts.set(qn("w:cs"), _DEFAULT_FONT)
+
+
+def _add_hyperlink(paragraph, url: str, text: str) -> None:
+    r_id = paragraph.part.relate_to(url, RT.HYPERLINK, is_external=True)
+
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+
+    run = OxmlElement("w:r")
+    run_properties = OxmlElement("w:rPr")
+
+    fonts = OxmlElement("w:rFonts")
+    fonts.set(qn("w:ascii"), _DEFAULT_FONT)
+    fonts.set(qn("w:hAnsi"), _DEFAULT_FONT)
+    run_properties.append(fonts)
+
+    color = OxmlElement("w:color")
+    color.set(qn("w:val"), _HYPERLINK_COLOR)
+    run_properties.append(color)
+
+    underline = OxmlElement("w:u")
+    underline.set(qn("w:val"), "single")
+    run_properties.append(underline)
+
+    run.append(run_properties)
+    text_element = OxmlElement("w:t")
+    text_element.text = text
+    run.append(text_element)
+    hyperlink.append(run)
+
+    paragraph._p.append(hyperlink)
 
 
 def _add_markdown_paragraph(document: Document, text: str, style: str | None = None) -> None:
     paragraph = document.add_paragraph(style=style)
     pos = 0
-    for match in _BOLD_PATTERN.finditer(text):
+    for match in _INLINE_PATTERN.finditer(text):
         if match.start() > pos:
             paragraph.add_run(text[pos : match.start()])
-        bold_run = paragraph.add_run(match.group(1))
-        bold_run.bold = True
-        pos = match.end()
+
+        if match.group("bold") is not None:
+            bold_run = paragraph.add_run(match.group("bold"))
+            bold_run.bold = True
+            pos = match.end()
+        elif match.group("link_url") is not None:
+            _add_hyperlink(paragraph, match.group("link_url"), match.group("link_text"))
+            pos = match.end()
+        else:
+            url = match.group("bare_url")
+            while url and url[-1] in _TRAILING_URL_PUNCTUATION:
+                url = url[:-1]
+            _add_hyperlink(paragraph, url, url)
+            pos = match.start() + len(url)
     if pos < len(text):
         paragraph.add_run(text[pos:])
 
 
 def markdown_to_docx(markdown: str) -> Document:
     """Covers the markdown shape the tailoring/cv_pal prompts actually
-    produce: headings, bold, bullets, plain paragraphs. Not a general
-    markdown renderer - an agent that wants something this doesn't cover
-    can ask for the markdown format instead.
+    produce: headings, bold, bullets, plain paragraphs, and links (markdown
+    `[text](url)` syntax or bare URLs). Not a general markdown renderer -
+    an agent that wants something this doesn't cover can ask for the
+    markdown format instead.
     """
     document = Document()
+    _apply_default_font(document)
     for raw_line in markdown.splitlines():
         line = raw_line.rstrip()
         if not line:

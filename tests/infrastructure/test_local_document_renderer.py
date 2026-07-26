@@ -2,6 +2,7 @@ import shutil
 
 import pytest
 from docx import Document
+from docx.oxml.ns import qn
 
 from cvpal.domain.errors import DocumentRenderError
 from cvpal.domain.generation.models import DocumentFormat
@@ -9,6 +10,16 @@ from cvpal.infrastructure.rendering.local_document_renderer import (
     LocalDocumentRenderer,
     markdown_to_docx,
 )
+
+
+def _hyperlinks(paragraph):
+    links = []
+    for hyperlink in paragraph._p.findall(qn("w:hyperlink")):
+        r_id = hyperlink.get(qn("r:id"))
+        url = paragraph.part.rels[r_id].target_ref
+        text = "".join(node.text or "" for node in hyperlink.iter(qn("w:t")))
+        links.append((text, url))
+    return links
 
 _SAMPLE_MARKDOWN = """\
 # Bruno Vargas Tettamanti
@@ -49,6 +60,33 @@ def test_markdown_to_docx_marks_bold_runs():
     paragraph = document.paragraphs[0]
     bold_runs = [r for r in paragraph.runs if r.bold]
     assert any(r.text == "Java" for r in bold_runs)
+
+
+def test_markdown_to_docx_uses_arial_as_default_font():
+    document = markdown_to_docx(_SAMPLE_MARKDOWN)
+    assert document.styles["Normal"].font.name == "Arial"
+    assert document.styles["Heading 1"].font.name == "Arial"
+    assert document.styles["Heading 2"].font.name == "Arial"
+    assert document.styles["List Bullet"].font.name == "Arial"
+
+
+def test_markdown_to_docx_renders_markdown_links_as_real_hyperlinks():
+    document = markdown_to_docx(
+        "Reach me on [LinkedIn](https://www.linkedin.com/in/bruno-vargas-tettamanti-dev)."
+    )
+    paragraph = document.paragraphs[0]
+    links = _hyperlinks(paragraph)
+    assert links == [("LinkedIn", "https://www.linkedin.com/in/bruno-vargas-tettamanti-dev")]
+    assert "[LinkedIn]" not in paragraph.text
+    assert paragraph.text.endswith(".")
+
+
+def test_markdown_to_docx_renders_bare_urls_as_real_hyperlinks():
+    document = markdown_to_docx("GitHub: https://github.com/brunovt074, always up to date.")
+    paragraph = document.paragraphs[0]
+    links = _hyperlinks(paragraph)
+    assert links == [("https://github.com/brunovt074", "https://github.com/brunovt074")]
+    assert paragraph.text.endswith("always up to date.")
 
 
 def test_render_markdown_format_writes_content_as_is(tmp_path):

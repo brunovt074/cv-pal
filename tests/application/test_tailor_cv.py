@@ -12,7 +12,7 @@ class _FakeJobPostingSource:
         return self._posting
 
 
-def test_tailor_cv_returns_markdown_document_in_detected_language():
+def test_tailor_cv_defaults_to_english():
     posting = JobPosting(source="text", raw_text="Backend developer, Java, Spring Boot, remote.")
     agent = FakeTextAgent(["# CV\n\nTailored content"])
 
@@ -20,7 +20,6 @@ def test_tailor_cv_returns_markdown_document_in_detected_language():
         _FakeJobPostingSource(posting),
         "## Personal Data\n...",
         agent,
-        detect_language=lambda _text: "en",
     )
 
     assert doc.kind == "cv"
@@ -29,7 +28,7 @@ def test_tailor_cv_returns_markdown_document_in_detected_language():
     assert doc.content == "# CV\n\nTailored content"
 
 
-def test_tailor_cv_language_override_wins_over_detection():
+def test_tailor_cv_language_override_wins_over_default():
     posting = JobPosting(source="text", raw_text="Some posting")
     agent = FakeTextAgent(["content"])
 
@@ -37,23 +36,9 @@ def test_tailor_cv_language_override_wins_over_detection():
         _FakeJobPostingSource(posting),
         "kb",
         agent,
-        detect_language=lambda _text: "en",
         language_override="es",
     )
     assert doc.language == "es"
-
-
-def test_tailor_cv_falls_back_to_english_when_language_undetected():
-    posting = JobPosting(source="text", raw_text="???")
-    agent = FakeTextAgent(["content"])
-
-    doc = tailor_cv(
-        _FakeJobPostingSource(posting),
-        "kb",
-        agent,
-        detect_language=lambda _text: "unknown",
-    )
-    assert doc.language == "en"
 
 
 def test_tailor_cv_sends_job_posting_and_knowledge_base_in_prompt():
@@ -64,7 +49,6 @@ def test_tailor_cv_sends_job_posting_and_knowledge_base_in_prompt():
         _FakeJobPostingSource(posting),
         "UNIQUE_KB_MARKER",
         agent,
-        detect_language=lambda _text: "en",
     )
 
     sent_prompt = agent.requests[0].prompt

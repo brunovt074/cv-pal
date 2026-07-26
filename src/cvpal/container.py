@@ -14,6 +14,7 @@ from cvpal.domain.errors import CapabilityNotSupportedError
 from cvpal.domain.knowledge.models import KnowledgeBase
 from cvpal.domain.ports.job_posting_source import JobPostingSourcePort
 from cvpal.domain.ports.text_completion import TextCompletionPort
+from cvpal.domain.ports.web_content import WebContentPort
 from cvpal.infrastructure.agents.registry import available_agents, build_agent
 from cvpal.infrastructure.job_postings.file_source import FileJobPostingSource
 from cvpal.infrastructure.job_postings.text_source import InlineTextJobPostingSource
@@ -29,6 +30,7 @@ from cvpal.infrastructure.persistence.markdown_knowledge_repository import (
     parse_markdown,
 )
 from cvpal.infrastructure.rendering.local_document_renderer import LocalDocumentRenderer
+from cvpal.infrastructure.web_content.http_web_content import HttpWebContent
 
 
 class Container:
@@ -85,6 +87,10 @@ class Container:
     def document_renderer(self) -> LocalDocumentRenderer:
         return LocalDocumentRenderer()
 
+    @property
+    def web_content(self) -> WebContentPort:
+        return HttpWebContent()
+
     def job_posting_source(
         self, *, text: str | None = None, file: Path | None = None, url: str | None = None
     ) -> JobPostingSourcePort:
@@ -95,4 +101,4 @@ class Container:
             return InlineTextJobPostingSource(text)
         if file is not None:
             return FileJobPostingSource(file)
-        return UrlJobPostingSource(url, web_content=None)
+        return UrlJobPostingSource(url, web_content=self.web_content)
