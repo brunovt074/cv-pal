@@ -45,7 +45,7 @@ def _seed_kb(container: Container) -> KnowledgeBase:
 def test_cv_pal_reports_missing_knowledge_base(tmp_path):
     container = _container(tmp_path)
     result = server._cv_pal(container, "some posting", "", "", "")
-    assert result == server._NO_KB_MESSAGE
+    assert "configure" in result
 
 
 def test_cv_pal_requires_exactly_one_of_text_file_or_url(tmp_path):
@@ -118,7 +118,7 @@ def test_cv_pal_reports_fetch_failure_from_url(tmp_path, monkeypatch):
 
 
 def test_get_cv_material_reports_missing_knowledge_base(tmp_path):
-    assert server._get_cv_material(_container(tmp_path)) == server._NO_KB_MESSAGE
+    assert "configure" in server._get_cv_material(_container(tmp_path))
 
 
 def test_get_cv_material_returns_lean_view(tmp_path):
@@ -133,7 +133,7 @@ def test_get_cv_material_returns_lean_view(tmp_path):
 
 
 def test_get_knowledge_base_reports_missing(tmp_path):
-    assert server._get_knowledge_base(_container(tmp_path), "") == server._NO_KB_MESSAGE
+    assert "configure" in server._get_knowledge_base(_container(tmp_path), "")
 
 
 def test_get_knowledge_base_full_document(tmp_path):
@@ -162,7 +162,7 @@ def test_get_knowledge_base_unknown_section(tmp_path):
 
 
 def test_update_knowledge_base_reports_missing(tmp_path):
-    assert server._update_knowledge_base(_container(tmp_path), "new content", False) == server._NO_KB_MESSAGE
+    assert "configure" in server._update_knowledge_base(_container(tmp_path), "new content", False)
 
 
 def test_update_knowledge_base_writes_and_backs_up(tmp_path):
@@ -198,7 +198,7 @@ def test_update_knowledge_base_force_overrides_rejection(tmp_path):
 
 
 def test_audit_knowledge_base_reports_missing(tmp_path):
-    assert server._audit_knowledge_base(_container(tmp_path)) == server._NO_KB_MESSAGE
+    assert "configure" in server._audit_knowledge_base(_container(tmp_path))
 
 
 def test_audit_knowledge_base_no_inconsistencies(tmp_path):
@@ -343,3 +343,63 @@ def test_render_document_rejects_unknown_kind(tmp_path):
         company="X",
     )
     assert "Unknown kind" in result
+
+
+# --- onboarding message tri-state ---
+
+
+def test_onboarding_message_first_time_setup_when_no_config_file(tmp_path):
+    container = _container(tmp_path)
+    result = server._onboarding_message(container)
+    assert "First-time setup" in result
+    assert "configure" in result
+
+
+def test_onboarding_message_missing_source_files_when_configured_but_raw_dir_empty(tmp_path):
+    container = _container(tmp_path)
+    container.settings.config_file.parent.mkdir(parents=True, exist_ok=True)
+    container.settings.config_file.write_text("[user]\nname = \"Test\"\n")
+
+    result = server._onboarding_message(container)
+
+    assert "No CV source files found" in result
+    assert "configure" in result
+
+
+def test_onboarding_message_suggests_ingest_when_configured_with_source_files(tmp_path):
+    container = _container(tmp_path)
+    container.settings.config_file.parent.mkdir(parents=True, exist_ok=True)
+    container.settings.config_file.write_text("[user]\nname = \"Test\"\n")
+    container.settings.raw_dir.mkdir(parents=True, exist_ok=True)
+    (container.settings.raw_dir / "resume.pdf").write_bytes(b"%PDF-1.4\n")
+
+    result = server._onboarding_message(container)
+
+    assert "ingest_corpus" in result
+    assert "rebuild_knowledge_base" in result
+    assert "First-time setup" not in result
+    assert "No CV source files" not in result
+
+
+# --- configure ---
+
+
+def test_configure_writes_raw_dir_and_default_language(tmp_path):
+    container = _container(tmp_path)
+    result = server._configure(container, str(tmp_path / "my-cvs"), "es", "", "")
+
+    assert "Saved" in result
+    assert "ingest_corpus" in result
+    saved = container.settings.config_file.read_text()
+    assert 'raw_dir = "' + str(tmp_path / "my-cvs") + '"' in saved
+    assert 'default_language = "es"' in saved
+
+
+def test_configure_only_sets_provided_fields(tmp_path):
+    container = _container(tmp_path)
+    server._configure(container, str(tmp_path / "cvs"), "", "", "")
+    server._configure(container, "", "", "Jordan Smith", "")
+
+    saved = container.settings.config_file.read_text()
+    assert 'name = "Jordan Smith"' in saved
+    assert "raw_dir = \"" + str(tmp_path / "cvs") + "\"" in saved  # untouched by the second call

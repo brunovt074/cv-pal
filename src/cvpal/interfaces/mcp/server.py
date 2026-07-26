@@ -28,6 +28,7 @@ from cvpal.application.services.markdown_sections import extract_section_block
 from cvpal.application.services.output_naming import build_output_filename
 from cvpal.application.use_cases.audit_knowledge_base import audit_personal_data
 from cvpal.application.use_cases.build_knowledge_base import build_knowledge_base
+from cvpal.application.use_cases.configure_user import write_user_config
 from cvpal.application.use_cases.ingest_documents import ingest_documents
 from cvpal.application.use_cases.update_knowledge_base import (
     update_knowledge_base as apply_knowledge_base_update,
@@ -40,14 +41,38 @@ from cvpal.domain.generation.models import DocumentFormat
 
 mcp = FastMCP("cvpal")
 
-_NO_KB_MESSAGE = (
-    "No knowledge base found yet. Ask the user to run `cvpal ingest` then `cvpal kb build`, "
-    "or call the rebuild_knowledge_base tool (it will ingest first if needed)."
-)
-
 
 def _container() -> Container:
     return Container(get_settings())
+
+
+def _onboarding_message(container: Container) -> str:
+    """What to tell the host agent instead of a bare "no knowledge base" -
+    distinguishes never-configured from configured-but-no-source-files from
+    configured-with-files-but-not-ingested-yet, so the guidance is always
+    actionable rather than a dead end.
+    """
+    settings = container.settings
+    if not settings.config_file.exists():
+        return (
+            "First-time setup - no configuration found yet. Ask the user (1) which folder "
+            "contains their CV/resume files (PDF/DOCX/ODT), and (2) what language they'd like "
+            "CVs drafted in by default (e.g. 'en', 'es'). Then call the configure tool with "
+            "their answers, followed by ingest_corpus and rebuild_knowledge_base."
+        )
+    has_source_files = settings.raw_dir.exists() and bool(
+        container.document_parser.discover(settings.raw_dir)
+    )
+    if not has_source_files:
+        return (
+            f"No CV source files found at {settings.raw_dir}. Ask the user where their CV/resume "
+            "files are, call the configure tool with raw_dir set to that path, then call "
+            "ingest_corpus and rebuild_knowledge_base."
+        )
+    return (
+        "No knowledge base found yet. Call ingest_corpus then rebuild_knowledge_base "
+        "(or just rebuild_knowledge_base - it ingests first if needed)."
+    )
 
 
 def _cv_pal(
@@ -58,7 +83,7 @@ def _cv_pal(
     language: str,
 ) -> str:
     if not container.knowledge_repository.exists():
-        return _NO_KB_MESSAGE
+        return _onboarding_message(container)
     provided = [v for v in (job_posting_text, job_posting_file, job_posting_url) if v]
     if len(provided) != 1:
         return "Provide exactly one of job_posting_text, job_posting_file, or job_posting_url."
@@ -72,7 +97,7 @@ def _cv_pal(
         posting = source.read()
     except JobPostingFetchError as exc:
         return str(exc)
-    resolved_language = language or "en"
+    resolved_language = language or container.settings.user.default_language
 
     kb = container.knowledge_repository.load()
     agent_view = render_agent_view(kb)
@@ -90,14 +115,15 @@ def cv_pal(
     the user's knowledge base. Provide exactly one of job_posting_text
     (pasted text), job_posting_file (path to a .txt/.md/.docx file), or
     job_posting_url (a link to the posting - fetched and stripped to
-    readable text). Leave language empty to default to English.
+    readable text). Leave language empty to use the user's configured
+    default language (English unless changed via the configure tool).
     """
     return _cv_pal(_container(), job_posting_text, job_posting_file, job_posting_url, language)
 
 
 def _get_cv_material(container: Container) -> str:
     if not container.knowledge_repository.exists():
-        return _NO_KB_MESSAGE
+        return _onboarding_message(container)
     return render_agent_view(container.knowledge_repository.load())
 
 
@@ -112,7 +138,7 @@ def get_cv_material() -> str:
 
 def _get_knowledge_base(container: Container, section: str) -> str:
     if not container.knowledge_repository.exists():
-        return _NO_KB_MESSAGE
+        return _onboarding_message(container)
     full_text = container.settings.knowledge_base_md.read_text()
     if not section:
         return full_text
@@ -134,7 +160,7 @@ def get_knowledge_base(section: str = "") -> str:
 
 def _update_knowledge_base(container: Container, markdown: str, force: bool) -> str:
     if not container.knowledge_repository.exists():
-        return _NO_KB_MESSAGE
+        return _onboarding_message(container)
     current = container.knowledge_repository.load()
     result = apply_knowledge_base_update(
         current, markdown, container.parse_knowledge_base_markdown, force=force
@@ -159,7 +185,7 @@ def update_knowledge_base(markdown: str, force: bool = False) -> str:
 
 def _audit_knowledge_base(container: Container) -> str:
     if not container.knowledge_repository.exists():
-        return _NO_KB_MESSAGE
+        return _onboarding_message(container)
     inconsistencies = audit_personal_data(container.knowledge_repository.load())
     if not inconsistencies:
         return "No inconsistencies found."
@@ -175,6 +201,44 @@ def audit_knowledge_base() -> str:
     """Report personal-data fields with more than one distinct value
     across the CV corpus (phone, linkedin, github, ...)."""
     return _audit_knowledge_base(_container())
+
+
+def _configure(
+    container: Container, raw_dir: str, default_language: str, name: str, slug: str
+) -> str:
+    write_user_config(
+        container.settings.config_file,
+        name=name or None,
+        slug=slug or None,
+        default_language=default_language or None,
+        raw_dir=raw_dir or None,
+    )
+    return (
+        f"Saved to {container.settings.config_file}. Next: call ingest_corpus, then "
+        "rebuild_knowledge_base."
+    )
+
+
+@mcp.tool()
+def configure(
+    raw_dir: str = "",
+    default_language: str = "",
+    name: str = "",
+    slug: str = "",
+) -> str:
+    """Set up cv-pal for a new user, conversationally - call this whenever
+    another tool reports no configuration found yet. Ask the user for
+    whichever fields you don't already have:
+    - raw_dir: folder containing their CV/resume files (PDF/DOCX/ODT)
+    - default_language: e.g. 'en', 'es' - CVs are drafted in this language
+      unless a specific request overrides it
+    - name, slug: used in the knowledge base header and output file names
+      (e.g. slug "jane-doe" -> "jane-doe-cv-acme.pdf"); safe to leave these
+      two for later, raw_dir and default_language matter most up front
+    Only pass what you have - anything left blank keeps its existing
+    value, so this is safe to call more than once as you gather answers.
+    """
+    return _configure(_container(), raw_dir, default_language, name, slug)
 
 
 def _ingest_corpus(container: Container) -> str:

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 DEFAULT_NAME = "Alex Doe"
 DEFAULT_SLUG = "alex-doe"
+DEFAULT_LANGUAGE = "en"
 DEFAULT_PREFERRED_VALUES: dict[str, str] = {
     "phone": "+1-555-0100",
     "linkedin": "https://www.linkedin.com/in/alex-doe-dev/",
@@ -23,4 +24,5 @@ DEFAULT_PREFERRED_VALUES: dict[str, str] = {
 class UserProfile(BaseModel):
     name: str = DEFAULT_NAME
     slug: str = DEFAULT_SLUG
+    default_language: str = DEFAULT_LANGUAGE
     preferred_values: dict[str, str] = Field(default_factory=lambda: dict(DEFAULT_PREFERRED_VALUES))

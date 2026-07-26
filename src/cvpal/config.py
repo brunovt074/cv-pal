@@ -52,6 +52,10 @@ class Settings:
         self.user = UserProfile(
             name=os.environ.get("CVPAL_USER_NAME", user_section.get("name", default_user.name)),
             slug=os.environ.get("CVPAL_USER_SLUG", user_section.get("slug", default_user.slug)),
+            default_language=os.environ.get(
+                "CVPAL_DEFAULT_LANGUAGE",
+                user_section.get("default_language", default_user.default_language),
+            ),
             preferred_values={
                 "phone": os.environ.get(
                     "CVPAL_PHONE", preferred.get("phone", default_user.preferred_values["phone"])

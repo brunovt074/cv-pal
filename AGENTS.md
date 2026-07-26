@@ -67,7 +67,7 @@ calls an agent internally is `rebuild_knowledge_base` (the batch extraction pipe
 safe to call defensively since it's a no-op when the CV corpus hasn't changed (see the
 content-addressed checkpointing entry in the Decision Log).
 
-Tool/prompt surface: `cv_pal` (prompt), `get_cv_material`, `get_knowledge_base`,
+Tool/prompt surface: `cv_pal` (prompt), `configure`, `get_cv_material`, `get_knowledge_base`,
 `update_knowledge_base`, `audit_knowledge_base`, `ingest_corpus`, `rebuild_knowledge_base`,
 `render_document` (tools). See `skills/mcp-server/SKILL.md` for the full contract and design
 rationale per tool.
@@ -257,6 +257,7 @@ Architectural decisions made — do not relitigate without strong evidence:
 | Multi-user is a parameter, not implemented - the project maintainer's own CVs are the test fixture | The user's explicit direction: design every new piece to receive the knowledge base/paths as data, never hardcode an identity. `markdown_knowledge_repository.py`'s header, `personal_data_resolution.py`'s `PREFERRED_VALUES`, and `output_naming.py`'s user slug now read from `CVPAL_USER_NAME`/`CVPAL_PHONE`/`CVPAL_LINKEDIN`/`CVPAL_GITHUB`/`CVPAL_USER_SLUG` env vars (fictitious defaults) rather than a hardcoded name - an interim escape valve ahead of the real per-user config file (`~/.config/cvpal/config.toml`, see PROJECT_STATUS); `config.Settings` paths aren't yet namespaced per user either |
 | v1 targets only opencode and Claude Code, both over stdio - no HTTP/SSE, no ChatGPT/Pi | ChatGPT's MCP support is remote-connector-only (Pro/Business gated) and Pi has no known MCP support - both would need a different transport and auth model, deliberately out of scope until there's a concrete need |
 | Engram consulted every session, on this maintainer's machine | Not a project requirement - a personal workflow preference of whoever is developing this particular checkout. Contributors without engram (or any persistent-memory tool) configured skip that step entirely, see Agent Startup Protocol above |
+| First-time setup is conversational via MCP, not terminal-only | A new user connecting cv-pal to their agent (opencode, Claude Code, ...) shouldn't have to know `cvpal init` exists in a terminal first - the MCP `configure` tool plus `interfaces/mcp/server.py:_onboarding_message()`'s tri-state guidance (never configured / no CV source files yet / configured but not ingested) let the connected agent ask for the CV directory and default output language itself and call `configure` directly. `application/use_cases/configure_user.py:write_user_config()` is the shared writer behind both this and `cvpal init`'s terminal wizard, merging into `config.toml` rather than overwriting - either entry point can be used interchangeably, in any order |
 
 ---
 

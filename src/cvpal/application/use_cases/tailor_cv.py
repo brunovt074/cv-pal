@@ -11,8 +11,6 @@ from cvpal.domain.generation.models import DocumentFormat, TailoredDocument
 from cvpal.domain.ports.job_posting_source import JobPostingSourcePort
 from cvpal.domain.ports.text_completion import CompletionRequest, TextCompletionPort
 
-_DEFAULT_LANGUAGE = "en"
-
 
 def tailor_cv(
     job_posting_source: JobPostingSourcePort,
@@ -21,9 +19,10 @@ def tailor_cv(
     *,
     language_override: str | None = None,
     company: str = "",
+    default_language: str = "en",
 ) -> TailoredDocument:
     posting = job_posting_source.read()
-    language = language_override or _DEFAULT_LANGUAGE
+    language = language_override or default_language
 
     prompt = tailor_cv_prompt(knowledge_base_markdown, posting.raw_text, language)
     result = agent.complete(CompletionRequest(prompt=prompt))

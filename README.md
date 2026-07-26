@@ -41,13 +41,23 @@ breakdown.
 
 ## Quickstart
 
+No terminal setup required: install, connect to your agent (see below), and just ask it to use
+cv-pal. The first time, it'll ask where your CV/resume files are and what language you'd like
+CVs drafted in by default, then handle the rest itself.
+
 ```bash
 pip install cv-pal
-cvpal init      # interactive: your name, output-filename slug, CV source directory, agent
-cvpal doctor    # verifies everything is wired up correctly
 ```
 
-Then point your agent at the MCP server (see below), or drive it from the CLI:
+Prefer a terminal wizard instead? `cvpal init` asks the same questions interactively, and
+`cvpal doctor` verifies everything's wired up:
+
+```bash
+cvpal init
+cvpal doctor
+```
+
+Either way, once set up:
 
 ```bash
 cvpal ingest

@@ -17,6 +17,7 @@ def test_defaults_to_placeholder_identity_when_no_config_file_or_env(monkeypatch
 
     assert settings.user.name == "Alex Doe"
     assert settings.user.slug == "alex-doe"
+    assert settings.user.default_language == "en"
     assert settings.user.preferred_values["phone"] == "+1-555-0100"
     assert settings.agent_name == "opencode"
     assert settings.raw_dir == Path("./cv-raw")
@@ -32,6 +33,7 @@ def test_reads_values_from_config_file(tmp_path, monkeypatch):
 [user]
 name = "Jordan Smith"
 slug = "jordan-smith"
+default_language = "es"
 
 [user.preferred_values]
 phone = "+1-555-9999"
@@ -50,6 +52,7 @@ provider = "claude-code"
 
     assert settings.user.name == "Jordan Smith"
     assert settings.user.slug == "jordan-smith"
+    assert settings.user.default_language == "es"
     assert settings.user.preferred_values["phone"] == "+1-555-9999"
     assert settings.agent_name == "claude-code"
     assert settings.raw_dir == Path("/tmp/jordan-cvs")
@@ -70,6 +73,16 @@ slug = "jordan-smith"
 
     assert settings.user.name == "Jordan Smith"  # from config file, no env override
     assert settings.user.slug == "env-wins"  # env var wins over config file
+
+
+def test_default_language_env_var_overrides_config_file(tmp_path, monkeypatch):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text('[user]\ndefault_language = "es"\n')
+    monkeypatch.setenv("CVPAL_DEFAULT_LANGUAGE", "fr")
+
+    settings = Settings(config_path=config_file)
+
+    assert settings.user.default_language == "fr"
 
 
 def test_missing_config_file_does_not_raise(tmp_path):

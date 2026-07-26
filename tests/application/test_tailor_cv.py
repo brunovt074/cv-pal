@@ -41,6 +41,33 @@ def test_tailor_cv_language_override_wins_over_default():
     assert doc.language == "es"
 
 
+def test_tailor_cv_uses_configured_default_language_when_no_override():
+    posting = JobPosting(source="text", raw_text="Some posting")
+    agent = FakeTextAgent(["content"])
+
+    doc = tailor_cv(
+        _FakeJobPostingSource(posting),
+        "kb",
+        agent,
+        default_language="es",
+    )
+    assert doc.language == "es"
+
+
+def test_tailor_cv_language_override_wins_over_configured_default_language():
+    posting = JobPosting(source="text", raw_text="Some posting")
+    agent = FakeTextAgent(["content"])
+
+    doc = tailor_cv(
+        _FakeJobPostingSource(posting),
+        "kb",
+        agent,
+        language_override="fr",
+        default_language="es",
+    )
+    assert doc.language == "fr"
+
+
 def test_tailor_cv_sends_job_posting_and_knowledge_base_in_prompt():
     posting = JobPosting(source="text", raw_text="UNIQUE_JOB_MARKER")
     agent = FakeTextAgent(["content"])

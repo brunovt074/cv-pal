@@ -36,14 +36,16 @@ before changing which use case backs a handler.
   `grep -rln "cvpal.infrastructure" src/cvpal/interfaces/mcp` (must be empty).
 - **A missing knowledge base is a guided message, not a crash.** Every handler that needs
   `data/knowledge-base.md` checks `container.knowledge_repository.exists()` first and returns
-  `_NO_KB_MESSAGE` (points at `cvpal kb build` / `rebuild_knowledge_base`) instead of raising -
-  the host agent can read that and act on it.
+  `_onboarding_message(container)` instead of raising - a tri-state guide (never configured / no
+  CV source files yet / configured with files but not ingested) rather than one flat message, so
+  the host agent always has a concrete next action regardless of how far along the user is.
 
 ## Tool/prompt contract
 
 | Name | Kind | Calls an agent? | Purpose |
 |------|------|:---:|---------|
 | `cv_pal` | prompt | no | Assembles the one-shot tailoring prompt (lean KB view + posting + protocol). Primary entry point |
+| `configure` | tool | no | First-run and ongoing setup - writes `~/.config/cvpal/config.toml` (raw CV directory, default output language, name/slug). Called by the host agent conversationally, not just from `cvpal init` in a terminal |
 | `get_cv_material` | tool | no | Lean agent view as markdown, standalone |
 | `get_knowledge_base` | tool | no | Full markdown (with provenance), whole doc or one section |
 | `update_knowledge_base` | tool | no | Host-initiated edit; validates against a near-total-wipe heuristic, backs up, writes |

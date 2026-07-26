@@ -13,6 +13,7 @@ from cvpal.application.services.output_naming import build_output_filename
 from cvpal.application.use_cases.audit_knowledge_base import audit_personal_data
 from cvpal.application.use_cases.build_knowledge_base import build_knowledge_base
 from cvpal.application.use_cases.clean_outputs import clean_outputs
+from cvpal.application.use_cases.configure_user import write_user_config
 from cvpal.application.use_cases.ingest_documents import ingest_documents
 from cvpal.application.use_cases.tailor_cv import tailor_cv
 from cvpal.config import REPO_ROOT, get_settings
@@ -152,7 +153,7 @@ def tailor(
         "Leave empty to use 'untitled'.",
     ),
     language: str = typer.Option(
-        None, "--language", help="Output language (e.g. 'en', 'es'); defaults to English"
+        None, "--language", help="Output language (e.g. 'en', 'es'); defaults to your configured default_language"
     ),
     output: Path = typer.Option(
         None, "--output", "-o", help="Where to write the tailored CV (default: data/outputs/)"
@@ -186,7 +187,12 @@ def tailor(
     knowledge_base_markdown = settings.knowledge_base_md.read_text()
 
     tailored = tailor_cv(
-        source, knowledge_base_markdown, agent, language_override=language, company=company
+        source,
+        knowledge_base_markdown,
+        agent,
+        language_override=language,
+        company=company,
+        default_language=settings.user.default_language,
     )
 
     extension = {"markdown": "md", "docx": "docx", "pdf": "pdf"}[fmt.value]
@@ -295,6 +301,10 @@ def init() -> None:
         "Slug for output filenames (e.g. 'your-name-cv-acme.pdf')",
         default=settings.user.slug if settings.user.slug != default_profile.slug else default_slug,
     )
+    default_language = typer.prompt(
+        "Default language for drafted CVs/cover letters (e.g. 'en', 'es')",
+        default=settings.user.default_language,
+    )
     phone = typer.prompt("Phone (optional)", default=settings.user.preferred_values.get("phone", ""))
     linkedin = typer.prompt(
         "LinkedIn URL (optional)", default=settings.user.preferred_values.get("linkedin", "")
@@ -311,24 +321,17 @@ def init() -> None:
     if not raw_path.exists() and typer.confirm(f"{raw_path} doesn't exist. Create it?", default=True):
         raw_path.mkdir(parents=True, exist_ok=True)
 
-    config_text = f"""\
-[user]
-name = "{name}"
-slug = "{slug}"
-
-[user.preferred_values]
-phone = "{phone}"
-linkedin = "{linkedin}"
-github = "{github}"
-
-[paths]
-raw_dir = "{raw_dir}"
-
-[agent]
-provider = "{provider}"
-"""
-    settings.config_file.parent.mkdir(parents=True, exist_ok=True)
-    settings.config_file.write_text(config_text)
+    write_user_config(
+        settings.config_file,
+        name=name,
+        slug=slug,
+        default_language=default_language,
+        phone=phone,
+        linkedin=linkedin,
+        github=github,
+        raw_dir=raw_dir,
+        provider=provider,
+    )
     typer.echo(f"\nWrote {settings.config_file}")
 
     settings.data_dir.mkdir(parents=True, exist_ok=True)
