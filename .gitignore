@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+.env
+*.env.local
+google-service-account*.json
+
+# User's real CV data - personal, per-user, never shipped. See config.py's
+# CV_DATA_DIR/CV_RAW_DIR for pointing this elsewhere entirely (the intended
+# setup once ~/.config/cvpal exists - see PROJECT_STATUS.md).
+data/
+
+.engram/
+.claude/
+.idea/
+.vscode/

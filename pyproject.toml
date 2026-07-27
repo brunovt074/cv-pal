@@ -1,0 +1,58 @@
+[project]
+name = "cv-pal"
+version = "0.1.0"
+description = "Agent-agnostic CV/cover-letter tailoring, consumed as an MCP server by opencode, Claude Code, and other AI agents"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [{ name = "Bruno Vargas Tettamanti" }]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Topic :: Office/Business",
+]
+dependencies = [
+    "pdfplumber>=0.11",
+    "pypdf>=5.0",
+    "python-docx>=1.1",
+    "odfpy>=1.4",
+    "typer>=0.13",
+    "pydantic>=2.9",
+    "python-dotenv>=1.0",
+    "mcp>=1.28,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/brunovt074/cv-pal"
+Issues = "https://github.com/brunovt074/cv-pal/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+]
+
+[project.scripts]
+cvpal = "cvpal.interfaces.cli.main:app"
+cvpal-mcp = "cvpal.interfaces.mcp.server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+# Pinned explicitly (ruff's own defaults expand across versions) so lint
+# results are reproducible regardless of which ruff a contributor has
+# installed - these are ruff's long-standing stable defaults: pycodestyle
+# errors (E4/E7/E9) and Pyflakes (F).
+select = ["E4", "E7", "E9", "F"]
