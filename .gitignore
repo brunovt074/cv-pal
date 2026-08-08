@@ -21,3 +21,6 @@ data/
 .claude/
 .idea/
 .vscode/
+
+# PII patterns for the fixture sweep - real personal data, never committed.
+scripts/pii_patterns.local

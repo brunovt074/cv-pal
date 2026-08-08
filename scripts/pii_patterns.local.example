@@ -1,0 +1,15 @@
+# One regex per line. Blank lines and # comments are ignored.
+# Matching is case-insensitive.
+#
+# Copy this file to pii_patterns.local (gitignored) and replace the
+# placeholders with the real values you want screened out of the binary
+# fixtures: your surname, handles, phone numbers, document numbers.
+#
+# Keep the real file OUT of version control. It is a list of your personal
+# data by construction, so committing it publishes exactly what the sweep
+# exists to catch.
+
+your-surname
+your-handle
+your-email@example.com
+[0-9]{7,11}
