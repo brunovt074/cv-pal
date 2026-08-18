@@ -330,6 +330,8 @@ def test_render_document_builds_cover_letter_filename_from_kind_and_company(tmp_
         company="Acme Corp",
     )
     assert "alex-doe-cl-acme-corp.pdf" in result
+    assert "cover-letter/" in result
+    assert (container.settings.outputs_dir / "cover-letter" / "alex-doe-cl-acme-corp.pdf").exists()
 
 
 def test_render_document_rejects_unknown_kind(tmp_path):

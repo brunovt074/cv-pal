@@ -25,14 +25,33 @@ def test_clean_outputs_remove_all_wipes_every_file(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
-def test_clean_outputs_remove_all_ignores_subdirectories(tmp_path):
-    _seed_outputs(tmp_path, ["keep.pdf"])
-    subdir = tmp_path / "profiles"
-    subdir.mkdir()
-    (subdir / "inside.md").write_text("x")
+def test_clean_outputs_remove_all_recurses_into_cover_letter_subfolder(tmp_path):
+    _seed_outputs(tmp_path, ["alex-doe-cv-proxify.pdf"])
+    cl_dir = tmp_path / "cover-letter"
+    cl_dir.mkdir()
+    (cl_dir / "alex-doe-cl-proxify.pdf").write_text("x")
+    (cl_dir / "alex-doe-cl-other.docx").write_text("x")
     result = clean_outputs(outputs_dir=tmp_path, filename=None, remove_all=True)
-    assert [p.name for p in result.deleted] == ["keep.pdf"]
-    assert (subdir / "inside.md").exists()
+    assert sorted(p.name for p in result.deleted) == [
+        "alex-doe-cl-other.docx",
+        "alex-doe-cl-proxify.pdf",
+        "alex-doe-cv-proxify.pdf",
+    ]
+    assert not cl_dir.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_clean_outputs_remove_all_deletes_files_in_arbitrary_subdirectories(tmp_path):
+    _seed_outputs(tmp_path, ["alex-doe-cv-proxify.pdf"])
+    subdir = tmp_path / "unrelated"
+    subdir.mkdir()
+    (subdir / "should-be-removed.pdf").write_text("x")
+    result = clean_outputs(outputs_dir=tmp_path, filename=None, remove_all=True)
+    assert sorted(p.name for p in result.deleted) == [
+        "alex-doe-cv-proxify.pdf",
+        "should-be-removed.pdf",
+    ]
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_clean_outputs_rejects_missing_file(tmp_path):

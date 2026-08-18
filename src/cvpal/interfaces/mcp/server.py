@@ -25,7 +25,7 @@ from mcp.server.fastmcp import FastMCP
 from cvpal.application.prompts.cv_pal import cv_pal_prompt
 from cvpal.application.services.agent_view import render_agent_view
 from cvpal.application.services.markdown_sections import extract_section_block
-from cvpal.application.services.output_naming import build_output_filename
+from cvpal.application.services.output_naming import build_output_path
 from cvpal.application.use_cases.audit_knowledge_base import audit_personal_data
 from cvpal.application.use_cases.build_knowledge_base import build_knowledge_base
 from cvpal.application.use_cases.configure_user import write_user_config
@@ -313,7 +313,7 @@ def _render_document(
     extension = {"markdown": "md", "docx": "docx", "pdf": "pdf"}[fmt.value]
     if kind:
         try:
-            output_name = build_output_filename(
+            output_name = build_output_path(
                 kind=kind, company=company, extension=extension, user_slug=container.settings.user.slug
             )
         except ValueError as exc:

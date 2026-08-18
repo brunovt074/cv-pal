@@ -3,9 +3,10 @@
 Two modes:
 - remove a single file by exact name (sanity-checked to stay inside
   data/outputs/, with a directory-traversal guard)
-- wipe the whole outputs directory (--all)
+- wipe the whole outputs directory (--all) - recurses into the
+  cover-letter/ subfolder so cover letters are not orphaned
 
-This is a pure filesystem operation — no agent, no knowledge base, no
+This is a pure filesystem operation - no agent, no knowledge base, no
 network. Kept in application/ (not infrastructure) because it is
 policy-level (refuse to do anything if neither argument is supplied,
 refuse paths that escape the outputs dir) rather than a low-level
@@ -46,9 +47,12 @@ def clean_outputs(*, outputs_dir: Path, filename: str | None, remove_all: bool) 
     outputs_dir.mkdir(parents=True, exist_ok=True)
 
     if remove_all:
-        deleted = sorted(p for p in outputs_dir.iterdir() if p.is_file())
+        deleted = sorted(p for p in outputs_dir.rglob("*") if p.is_file())
         for path in deleted:
             path.unlink()
+        for subdir in sorted(outputs_dir.rglob("*"), reverse=True):
+            if subdir.is_dir() and not any(subdir.iterdir()):
+                subdir.rmdir()
         return CleanOutputsResult(deleted=deleted)
 
     target = (outputs_dir / filename).resolve()

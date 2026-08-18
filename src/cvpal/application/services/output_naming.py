@@ -1,8 +1,15 @@
-"""Build the conventional output filename for a tailored CV or cover letter.
+"""Build the conventional output path for a tailored CV or cover letter.
 
 Convention:
-    {user-slug}-cv-{company-lowercase-slug}.{ext}      for CVs
-    {user-slug}-cl-{company-lowercase-slug}.{ext}      for cover letters
+    {user-slug}-cv-{company-lowercase-slug}.{ext}              for CVs
+    cover-letter/{user-slug}-cl-{company-lowercase-slug}.{ext}  for cover letters
+
+Cover letters ALWAYS live under a `cover-letter/` subfolder of the outputs
+directory - keeps CVs and cover letters for the same application easy to
+spot together, and stops the outputs root from mixing the two
+interchangeably. The return value is a relative path, so callers do
+`outputs_dir / build_output_path(...)` and the renderer creates the
+subfolder on demand (see `infrastructure/rendering/local_document_renderer.py`).
 
 `{user-slug}` identifies the author and is per-user - never hardcoded,
 always passed in by the caller (`domain.user.profile.UserProfile.slug`,
@@ -21,6 +28,7 @@ import re
 import unicodedata
 
 _KIND_PREFIX = {"cv": "cv", "cover_letter": "cl"}
+_KIND_SUBDIR = {"cv": "", "cover_letter": "cover-letter"}
 _FALLBACK_COMPANY = "untitled"
 
 _NON_SLUG_CHARS = re.compile(r"[^a-z0-9-]+")
@@ -53,9 +61,13 @@ def _slugify_company(company: str) -> str:
     return collapsed or _FALLBACK_COMPANY
 
 
-def build_output_filename(*, kind: str, company: str, extension: str, user_slug: str) -> str:
+def build_output_path(*, kind: str, company: str, extension: str, user_slug: str) -> str:
     if kind not in _KIND_PREFIX:
         raise ValueError(f"Unknown document kind: {kind!r}. Use 'cv' or 'cover_letter'.")
     prefix = _KIND_PREFIX[kind]
     slug = _slugify_company(company)
-    return f"{user_slug}-{prefix}-{slug}.{extension}"
+    leaf = f"{user_slug}-{prefix}-{slug}.{extension}"
+    subdir = _KIND_SUBDIR[kind]
+    if not subdir:
+        return leaf
+    return f"{subdir}/{leaf}"

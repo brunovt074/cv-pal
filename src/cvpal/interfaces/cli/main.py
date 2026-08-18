@@ -9,7 +9,7 @@ from pathlib import Path
 import typer
 from dotenv import load_dotenv
 
-from cvpal.application.services.output_naming import build_output_filename
+from cvpal.application.services.output_naming import build_output_path
 from cvpal.application.use_cases.audit_knowledge_base import audit_personal_data
 from cvpal.application.use_cases.build_knowledge_base import build_knowledge_base
 from cvpal.application.use_cases.clean_outputs import clean_outputs
@@ -196,7 +196,7 @@ def tailor(
     )
 
     extension = {"markdown": "md", "docx": "docx", "pdf": "pdf"}[fmt.value]
-    default_name = build_output_filename(
+    default_name = build_output_path(
         kind="cv", company=tailored.company, extension=extension, user_slug=settings.user.slug
     )
     output_path = output or (settings.outputs_dir / default_name)
